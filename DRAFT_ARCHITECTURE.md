@@ -1,8 +1,18 @@
-# Identify Everything - Draft Architecture
+# "Identify Everything" - Draft Architecture
+
+## Revision History
+
+* v0.0 - Initial version by GLM 4.7 Flash via Venice.ai
+* v0.1 - Partial human review (Sections 1 & 2)
+* v0.3 - Switch to Python + FastAPI stack (GLM 4.7 Flash Heretic)
 
 ## Overview
 
-A mobile-first offline-first system for identifying items in the physical world using scannable QR codes that map to unique URLs. Data lives on local SQLite databases on devices, synchronizes to a central server via periodic uploads, and can be queried/searched via web interface.
+A mobile-first offline-first system for identifying items in the
+physical world using scannable QR codes that map to unique URLs. Data
+lives on local SQLite databases on devices, synchronizes to a central
+server via periodic uploads, and can be queried/searched via web
+interface.
 
 ## Core Components
 
@@ -11,37 +21,41 @@ A mobile-first offline-first system for identifying items in the physical world 
 #### Mobile App (Android - MVP)
 - QR code scanning with fallback to manual string entry
 - Local SQLite database for full data persistence
-- Offline sync queue (up to 1MB pending records)
+- Offline sync queue
 - Background sync when network is available
 - Conflict resolution (newer timestamp wins)
 - WebDAV-compatible sync protocol (HTTP+JSON)
 
 Key features:
 - Sync only changed records (incremental sync)
-- Store last 10 versions per item by default
+- Store last 3 versions per item by default (server keeps all)
 - Store attachments locally in device filesystem
 - Search entire local database for offline queries
+- Background sync when network is available
+- Easy configuration through environment variables
 
 #### Server Components
 
-**API Server** (Node.js/Express)
-- REST API for record CRUD operations
+**API Server** (Python + FastAPI)
+- REST API powered by FastAPI with async support
 - Sync endpoint that receives change sets
 - Search endpoint for JSON queries
 - Version history endpoint
 - Attachment storage (local disk or S3-compatible)
+- Built-in OpenAPI/Swagger documentation via FastAPI
 
-**Label Generator** (Web + CLI)
-- Generate QR codes with formatted URLs
+**Label Generator** (Python-based)
+- Generate QR codes with formatted URLs using python-qrcode
 - Batch label generation capability
 - Personalized labels (serial numbers, custom data)
 - Output for Avery labels (A4, 2x1") or thermal printers
+- Command-line interface: `python -m identify.labelgen --count=500 --format=avery`
 
 #### Web Interface (Future)
 
 - Read-only search interface
 - Display item metadata and history
-- Upload attachments, select location, etc.
+- Manually upload attachments, select location, etc.
 
 ### 2. Data Model
 
@@ -133,10 +147,10 @@ https://{domain}/objects/v1/{guid}
 ```
 
 - `{domain}` = User's DNS domain (e.g., `mylabels.example.com`)
-- For offline local resolution: `loc://{latitude},{longitude}/{guid}` (optional)
 - Records retrieved via HTTP GET with query parameter `?version={timestamp}`
+- GET without `?version={timestamp}` retrieves latest version in DB
 - No authentication required for public read access
-- Authorization and write access through sync protocol
+- Write access through sync protocol
 
 ### 5. Sync Protocol
 
@@ -321,23 +335,42 @@ CREATE TABLE offline_records (
 
 **Technology Stack**:
 
-- **Framework**: Node.js + Express
-- **Database**: PostgreSQL (production), SQLite (docker local dev)
-- **Queue**: Bull (Redis) or sqs (AWS) for background sync handling
-- **Storage**: Local filesystem + optional S3-compatible storage
-- **Search**: PostgreSQL tsvector for full-text search
-- **API**: REST with JWT auth (or sync_token)
+- **Backend Framework**: Python 3.11+ with FastAPI
+- **Database**: PostgreSQL (production), SQLite (dev) via SQLAlchemy ORM
+- **Data Validation**: Pydantic for request/response validation (type-safe)
+- **Queue**: Skip for MVP (process sync synchronously). For larger deployments: Redis + Celery with default concurrency
+- **Storage**: Local filesystem (uploads/) or S3-compatible storage (MinIO, AWS S3)
+- **Search**: PostgreSQL tsvector for full-text search via SQLAlchemy
+- **API**: REST with device_id + sync_token authentication
+- **API Documentation**: FastAPI auto-generated (Swagger UI, ReDoc)
+
+**Why SQLAlchemy instead of raw SQL?**
+
+For MVP with 10 users, writing raw Python with psycopg2 (direct SQL) is possible but introduces:
+- Manual migrations and schema management
+- No object-relational mapping benefits
+- More boilerplate code
+- Harder to switch databases later
+
+SQLAlchemy gives you:
+- ORM for expressive queries without raw SQL
+- Alembic for schema migrations
+- Different database backends with minimal changes
+- Built-in lazy loading, relationships, and validation
+
+For alignment with local SQLite on devices, we'll use: `SQLAlchemyConnection` with separate SQLite/PostgreSQL engines for local and remote
+
+<div class="section-break"></div>
 
 **Docker Setup**:
 ```yaml
 services:
   api:
     build: .
-    ports: ["3000:3000"]
+    ports: ["8000:8000"]
     environment:
-      - POSTGRES_HOST=db
-      - POSTGRES_USER=app
-      - POSTGRES_PASSWORD=secret
+      - DATABASE_URL=postgresql://app:secret@db:5432/identify
+      - UPLOAD_DIR=/app/uploads
     volumes:
       - uploads:/app/uploads
 
@@ -348,13 +381,20 @@ services:
 
   worker:
     build: .
-    command: node worker.js
-    depends_on: [api, db]
+    command: celery -A app.worker worker --loglevel=info
+    depends_on: [api, db, redis]
+
+  redis:
+    image: redis:7-alpine
+    ports: ["6379:6379"]
 
 volumes:
   uploads:
   postgres_data:
 ```
+
+**Queue Decision for MVP**:
+For 10 users or less, skip Celery entirely. Process `/sync/upload` synchronously in the API handler. It's simpler, uses fewer resources, and eliminates worker management during development. Add Celery + Redis once you need background processing for large attachments (>5MB) or want to test parallel sync processing.
 
 **API Endpoints**:
 
@@ -362,11 +402,13 @@ volumes:
 GET    /api/v1/items/:guid                 # Get latest item version
 GET    /api/v1/items/:guid/versions       # Get all versions
 GET    /api/v1/items/sync?after=...        # Get changes for sync
-POST   /api/v1/sync/upload                 # Upload local changes
-GET    /api/v1/search?q=...                # Search items
-POST   /api/v1/items/:guid/attach          # Upload attachment
+POST   /api/v1/sync/upload                 # Upload local changes (device_id required)
+GET    /api/v1/search?q=...                # Search items (full-text search)
+POST   /api/v1/items/:guid/attach          # Upload attachment (multipart/form-data)
 GET    /api/v1/items/:guid/version/:vid    # Get specific version
 ```
+
+Endpoints are automatically documented with Swagger UI at `/docs` and ReDoc at `/redoc`
 
 ### 11. Error Handling
 
