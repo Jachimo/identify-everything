@@ -1,0 +1,8 @@
+python-qrcode[full]==7.4.0
+reportlab==4.0.7
+pillow==10.1.0
+
+# Development
+pytest==7.4.3
+pytest-cov==4.1.0
+black==23.11.0

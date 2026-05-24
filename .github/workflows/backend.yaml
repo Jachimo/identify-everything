@@ -1,0 +1,84 @@
+name: Backend Tests
+
+on:
+  push:
+    branches: [ main ]
+  pull_request:
+    paths: ['server/**']
+
+jobs:
+  lint:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - name: Set up Python
+        uses: actions/setup-python@v4
+        with:
+          python-version: '3.11'
+      - name: Lint with Black
+        run: |
+          pip install black
+          black --check server/
+
+  test:
+    runs-on: ubuntu-latest
+    strategy:
+      matrix:
+        python-version: ['3.11']
+    services:
+      postgres:
+        image: postgres:15
+        env:
+          POSTGRES_PASSWORD: postgres
+          POSTGRES_DB: identify
+        options: >-
+          --health-cmd pg_isready
+          --health-interval 10s
+          --health-timeout 5s
+          --health-retries 5
+        ports:
+          - 5432:5432
+    steps:
+      - uses: actions/checkout@v4
+      - name: Set up Python ${{ matrix.python-version }}
+        uses: actions/setup-python@v4
+        with:
+          python-version: ${{ matrix.python-version }}
+      - name: Run migrations
+        run: |
+          pip install -r server/requirements.txt
+          cd server
+          alembic upgrade head
+      - name: Run API tests
+        run: |
+          cd server
+          pytest tests/ --env 0 -v
+      - name: Generate coverage report
+        run: |
+          cd server
+          pytest tests/ --cov=identify --cov-report=xml
+
+  test-integration:
+    runs-on: macos-latest
+    strategy:
+      matrix:
+        api: [29, 31, 33, 34]
+    steps:
+      - uses: actions/checkout@v4
+      - name: Build API
+        shell: bash
+        working-directory: server
+        run: |
+          pip install -r requirements.txt
+          pip install docker-compose
+          docker-compose up -d
+          sleep 10
+
+      - name: Run integration tests
+        shell: bash
+        working-directory: server
+        run: |
+          docker-compose exec api pytest tests/ --test-api -v
+
+      - name: Cleanup
+        run: docker-compose down
