@@ -59,15 +59,21 @@ def process_sync_upload(db: Session, device_id: str, changes: dict) -> dict:
             domain = version_data.get("domain", "unknown")
             if not guid:
                 continue  # skip malformed entries without guid
-            item = Item(
-                item_id=item_id,
-                guid=guid,
-                url=url or f"https://{domain}/objects/v1/{guid}",
-                domain=domain,
-            )
-            db.add(item)
-            db.flush()
-            created += 1
+
+            # Check if another device already created an item with this GUID
+            existing = db.query(Item).filter(Item.guid == guid).first()
+            if existing:
+                item = existing
+            else:
+                item = Item(
+                    item_id=item_id,
+                    guid=guid,
+                    url=url or f"https://{domain}/objects/v1/{guid}",
+                    domain=domain,
+                )
+                db.add(item)
+                db.flush()
+                created += 1
 
         db.query(ItemVersion).filter(
             ItemVersion.item_id == item_id,
