@@ -48,7 +48,7 @@ def update_item(guid: str, payload: ItemUpdate, db: Session = Depends(get_db)):
 
 
 @router.post("/{guid}/attach", response_model=AttachmentOut, status_code=201)
-async def upload_attachment(
+def upload_attachment(
     guid: str,
     file: UploadFile = File(...),
     db: Session = Depends(get_db),
@@ -59,8 +59,8 @@ async def upload_attachment(
     if not version:
         raise HTTPException(status_code=404, detail="VERSION_NOT_FOUND")
 
-    data = await file.read()
-    file_path, content_hash, size = await storage_service.save_file(file.filename, data)
+    data = file.file.read()
+    file_path, content_hash, size = storage_service.save_file(file.filename, data)
 
     attachment = Attachment(
         version_id=version.version_id,

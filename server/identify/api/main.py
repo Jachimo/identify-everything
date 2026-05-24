@@ -32,7 +32,7 @@ app = FastAPI(
 app.add_middleware(
     CORSMiddleware,
     allow_origins=["*"],
-    allow_credentials=True,
+    allow_credentials=False,  # credentials not supported with wildcard origins per Fetch spec
     allow_methods=["*"],
     allow_headers=["*"],
 )

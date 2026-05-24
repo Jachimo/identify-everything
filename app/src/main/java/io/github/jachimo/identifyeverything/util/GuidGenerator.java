@@ -44,7 +44,7 @@ public class GuidGenerator {
         return result.toString();
     }
 
-    public static final Pattern GUID_PATTERN = Pattern.compile("^[a-p0-9]{28}$");
+    public static final Pattern GUID_PATTERN = Pattern.compile("^[a-p0-9]{4}_[a-p0-9]{4}_[a-p0-9]{4}_[a-p0-9]{4}$");
 
     public static boolean isValidGuid(String guid) {
         if (guid == null) return false;
