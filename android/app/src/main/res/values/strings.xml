@@ -8,4 +8,5 @@
     <string name="sync_error">Sync error: %s</string>
     <string name="sync_success">Sync completed successfully</string>
     <string name="error_occurred">Error occurred</string>
+    <string name="appbar_scrolling_view_behavior">com.google.android.material.appbar.AppBarLayout$ScrollingViewBehavior</string>
 </resources>

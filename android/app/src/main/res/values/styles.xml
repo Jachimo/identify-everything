@@ -1,4 +1,15 @@
 <resources>
+    <!-- Material Design theme for the app -->
+    <style name="Theme.IdentifyEverything" parent="Theme.MaterialComponents.Light.NoActionBar">
+        <item name="colorPrimary">@color/primary</item>
+        <item name="colorPrimaryVariant">@color/primary_dark</item>
+        <item name="colorOnPrimary">@android:color/white</item>
+        <item name="colorSecondary">@color/secondary</item>
+        <item name="colorSecondaryVariant">@color/secondary_dark</item>
+        <item name="colorOnSecondary">@android:color/black</item>
+        <item name="android:statusBarColor">@color/primary_dark</item>
+    </style>
+
     <style name="Widget.AppCompat.EditText" parent="Widget.AppCompat.EditText">
         <item name="android:background">@drawable/edit_text_background</item>
         <item name="android:textColorHint">@android:color/tertiary_text_dark</item>
