@@ -6,7 +6,7 @@ import com.identify.Everything.data.entities.Item;
 import com.identify.Everything.data.entities.ItemVersion;
 
 @Database(
-    entities = {Item.class, ItemVersion.class},
+    entities = {Item.class, ItemVersion.class, SyncQueue.class},
     version = 1,
     exportSchema = false
 )
@@ -18,6 +18,7 @@ public abstract class AppDatabase extends RoomDatabase {
 
     public abstract ItemDao itemDao();
     public abstract ItemVersionDao itemVersionDao();
+    public abstract SyncQueueDao syncQueueDao();
 
     public static AppDatabase getDatabase(final Context context) {
         if (INSTANCE == null) {

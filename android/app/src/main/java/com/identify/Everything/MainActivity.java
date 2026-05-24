@@ -1,5 +1,6 @@
 package com.identify.Everything;
 
+import android.content.Intent;
 import android.os.Bundle;
 import androidx.appcompat.app.AppCompatActivity;
 import androidx.lifecycle.ViewModelProvider;
@@ -29,9 +30,12 @@ public class MainActivity extends AppCompatActivity {
                 return;
             }
 
-            // TODO: Navigate to item details view
+            // Navigate to item details with GUID and URL
             String url = "https://mylabels.example.com/objects/v1/" + guid;
-            Toast.makeText(this, getString(R.string.item_url, url), Toast.LENGTH_LONG).show();
+            Intent intent = new Intent(this, ItemDetailsActivity.class);
+            intent.putExtra("GUID", guid);
+            intent.putExtra("URL", url);
+            startActivity(intent);
         });
     }
 }
