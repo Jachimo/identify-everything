@@ -47,11 +47,27 @@ def process_sync_upload(db: Session, device_id: str, changes: dict) -> dict:
         db.flush()
 
     processed = 0
+    created = 0
     for version_data in changes.get("item_versions", []):
         item_id = version_data.get("item_id")
         item = db.query(Item).filter(Item.item_id == item_id).first()
+
+        # Auto-create item if it doesn't exist on server
         if not item:
-            continue
+            guid = version_data.get("guid")
+            url = version_data.get("url")
+            domain = version_data.get("domain", "unknown")
+            if not guid:
+                continue  # skip malformed entries without guid
+            item = Item(
+                item_id=item_id,
+                guid=guid,
+                url=url or f"https://{domain}/objects/v1/{guid}",
+                domain=domain,
+            )
+            db.add(item)
+            db.flush()
+            created += 1
 
         db.query(ItemVersion).filter(
             ItemVersion.item_id == item_id,
@@ -78,4 +94,4 @@ def process_sync_upload(db: Session, device_id: str, changes: dict) -> dict:
     db.add(record)
     device.last_sync_at = datetime.now(timezone.utc)
     db.commit()
-    return {"processed": processed}
+    return {"processed": processed, "created": created}

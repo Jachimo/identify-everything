@@ -48,7 +48,7 @@ def update_item(guid: str, payload: ItemUpdate, db: Session = Depends(get_db)):
 
 
 @router.post("/{guid}/attach", response_model=AttachmentOut, status_code=201)
-async def upload_attachment(
+def upload_attachment(
     guid: str,
     file: UploadFile = File(...),
     db: Session = Depends(get_db),
@@ -59,8 +59,8 @@ async def upload_attachment(
     if not version:
         raise HTTPException(status_code=404, detail="VERSION_NOT_FOUND")
 
-    data = await file.read()
-    file_path, content_hash, size = await storage_service.save_file(file.filename, data)
+    data = file.file.read()
+    file_path, content_hash, size = storage_service.save_file(file.filename, data)
 
     attachment = Attachment(
         version_id=version.version_id,
@@ -87,6 +87,7 @@ def delete_attachment(guid: str, vid: str, attachment_id: str, db: Session = Dep
     attachment = db.query(Attachment).filter(Attachment.attachment_id == attachment_id).first()
     if not attachment:
         raise HTTPException(status_code=404, detail="ATTACHMENT_NOT_FOUND")
-    storage_service.delete_file(attachment.file_path)
+    if not storage_service.delete_file(attachment.file_path):
+        raise HTTPException(status_code=500, detail="FILE_DELETE_FAILED")
     db.delete(attachment)
     db.commit()

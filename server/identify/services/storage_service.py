@@ -12,7 +12,7 @@ def get_upload_dir() -> Path:
     return p
 
 
-async def save_file(filename: str, data: bytes) -> tuple[str, str, int]:
+def save_file(filename: str, data: bytes) -> tuple[str, str, int]:
     upload_dir = get_upload_dir()
     file_id = str(uuid.uuid4())
     safe_name = f"{file_id}_{filename}"
