@@ -1,0 +1,11 @@
+<resources>
+    <string name="app_name">Identify Everything</string>
+    <string name="guid_hint">Enter GUID (e.g., 3k7x9b_p1j4_nv6d)</string>
+    <string name="view_item_details">View Item Details</string>
+    <string name="empty_guid_error">Please enter a GUID</string>
+    <string name="invalid_guid_error">Invalid GUID format. Expected Base26 (28 characters)</string>
+    <string name="item_url">Item URL: %s</string>
+    <string name="sync_error">Sync error: %s</string>
+    <string name="sync_success">Sync completed successfully</string>
+    <string name="error_occurred">Error occurred</string>
+</resources>
