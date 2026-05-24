@@ -87,6 +87,7 @@ def delete_attachment(guid: str, vid: str, attachment_id: str, db: Session = Dep
     attachment = db.query(Attachment).filter(Attachment.attachment_id == attachment_id).first()
     if not attachment:
         raise HTTPException(status_code=404, detail="ATTACHMENT_NOT_FOUND")
-    storage_service.delete_file(attachment.file_path)
+    if not storage_service.delete_file(attachment.file_path):
+        raise HTTPException(status_code=500, detail="FILE_DELETE_FAILED")
     db.delete(attachment)
     db.commit()

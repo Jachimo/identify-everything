@@ -53,14 +53,30 @@ def sync_download(
 
     items, deleted_items = sync_service.get_changes_since(db, after_dt)
 
+    # Batch query all canonical versions in one round-trip
+    item_ids = [item.item_id for item in items]
+    canonical_map = {}
+    if item_ids:
+        canonical_versions = (
+            db.query(ItemVersion)
+            .filter(
+                ItemVersion.item_id.in_(item_ids),
+                ItemVersion.is_canonical == True,
+            )
+            .all()
+        )
+        canonical_map = {v.item_id: v for v in canonical_versions}
+
     items_added = []
     for item in items:
-        version = (
-            db.query(ItemVersion)
-            .filter(ItemVersion.item_id == item.item_id, ItemVersion.is_canonical == True)
-            .order_by(ItemVersion.created_at.desc())
-            .first()
-        )
+        version = canonical_map.get(item.item_id)
+        if not version:
+            version = (
+                db.query(ItemVersion)
+                .filter(ItemVersion.item_id == item.item_id)
+                .order_by(ItemVersion.created_at.desc())
+                .first()
+            )
         items_added.append(SyncDownloadItem(
             item_id=item.item_id,
             guid=item.guid,
