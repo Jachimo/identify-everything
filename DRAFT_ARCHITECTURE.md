@@ -202,30 +202,30 @@ https://{domain}/objects/v1/{guid}
 
 ### 6. Label Generator
 
-**QR Code Generation**:
+**Local QR Code Generation**
 
-Output:
-```
-{
-  "qr_code_url": "https://api.qrserver.com/v1/create-qr-code/?size=256x256&data=...&color=000000&bgcolor=FFFFFF",
-  "raw_data": "https://mylabels.example.com/objects/v1/3k7x9b_p1j4_nv6d",
-  "guid": "3k7x9b_p1j4_nv6d",
-  "domain": "mylabels.example.com",
-  "is_custom": false
-}
-```
+QR codes are generated entirely offline using the `python-qrcode` library - no external dependencies, no API calls required.
 
-**Label Formats**:
+Feature highlights:
+- **Complete offline functionality**: generate labels while air-gapped
+- **Three output formats**: PNG (preview/debug), SVG (vector), PDF (printing)
+- **Label formats**: Avery 2" × 0.75" (5160 format), 58mm/80mm thermal printers
+- **Batch processing**: Generate from CSV file with arbitrary GUID/domain mapping
+- **CLI interface**: `python -m identify.labelgen --batch labels.csv --output labels/`
 
-- Avery 5160 (2" × 0.75", 30 per sheet)
-- Thermal printer (58mm/80mm)
-- Custom sticky labels (user formats)
+**Implementation details**:
 
-**Batch Processing**:
-- Generate N random GUIDs
-- Output CSV with QR code URLs, raw data, domain
-- CLI: `npm run labels -- --count=500 --format=avery`
-- Web interface: Upload spreadsheet, generate QR codes
+- Library: `python-qrcode` for encoding, `reportlab` for PDF generation, `Pillow` for image manipulation
+- QR code sizing configurable based on application needs (default: 256px)
+- High error correction (ERROR_CORRECT_H) for durability against wear
+- Data validation ensures URLs/loc:// URIs are properly encoded
+- Generates directly to file or streams as base64-encoded data for web usage
+
+For complete implementation specifications, refer to **[QR_GENERATOR.md](./QR_GENERATOR.md)** including:
+- Core Python API for programmatic use
+- CLI command flags and usage
+- Output format specifications
+- Testing strategies and performance characteristics
 
 ### 7. Mobile Data Storage (SQLite)
 
@@ -338,6 +338,7 @@ CREATE TABLE offline_records (
 - **Backend Framework**: Python 3.11+ with FastAPI
 - **Database**: PostgreSQL (production), SQLite (dev) via SQLAlchemy ORM
 - **Data Validation**: Pydantic for request/response validation (type-safe)
+- **QR Code Generator**: Python-based local generation (python-qrcode, reportlab, Pillow)
 - **Queue**: Skip for MVP (process sync synchronously). For larger deployments: Redis + Celery with default concurrency
 - **Storage**: Local filesystem (uploads/) or S3-compatible storage (MinIO, AWS S3)
 - **Search**: PostgreSQL tsvector for full-text search via SQLAlchemy
