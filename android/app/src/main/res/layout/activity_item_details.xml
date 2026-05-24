@@ -19,15 +19,7 @@
             android:orientation="vertical"
             android:paddingBottom="80dp">
 
-            <TextView
-                android:id="@+id/guidDisplay"
-                android:layout_width="match_parent"
-                android:layout_height="wrap_content"
-                android:layout_marginBottom="4dp"
-                android:textAppearance="@style/TextAppearance.AppCompat.Caption"
-                android:textColor="@android:color/darker_gray"
-                tools:text="GUID: 3k7x9b_p1j4_nv6d" />
-
+            <!-- URL Display -->
             <TextView
                 android:id="@+id/urlText"
                 android:layout_width="match_parent"
@@ -36,6 +28,7 @@
                 android:textColor="@android:color/darker_gray"
                 tools:text="https://mylabels.example.com/objects/v1/3k7x9b_p1j4_nv6d" />
 
+            <!-- Version Info -->
             <TextView
                 android:id="@+id/versionText"
                 android:layout_width="match_parent"
@@ -46,6 +39,7 @@
                 android:textColor="@android:color/holo_blue_dark"
                 tools:text="Latest Version: 1" />
 
+            <!-- Title -->
             <com.google.android.material.textfield.TextInputLayout
                 android:id="@+id/titleContainer"
                 style="@style/Widget.MaterialComponents.TextInputLayout.OutlinedBox"
@@ -66,6 +60,14 @@
                     android:textSize="18sp" />
             </com.google.android.material.textfield.TextInputLayout>
 
+            <!-- Description -->
+            <TextView
+                android:layout_width="match_parent"
+                android:layout_height="wrap_content"
+                android:layout_marginBottom="8dp"
+                android:text="Description"
+                android:textAppearance="@style/TextAppearance.AppCompat.Label" />
+
             <com.google.android.material.textfield.TextInputLayout
                 style="@style/Widget.MaterialComponents.TextInputLayout.OutlinedBox"
                 android:layout_width="match_parent"
@@ -84,6 +86,14 @@
                     android:inputType="textMultiLine"
                     android:minHeight="120dp" />
             </com.google.android.material.textfield.TextInputLayout>
+
+            <!-- Location -->
+            <TextView
+                android:layout_width="match_parent"
+                android:layout_height="wrap_content"
+                android:layout_marginBottom="8dp"
+                android:text="Location"
+                android:textAppearance="@style/TextAppearance.AppCompat.Label" />
 
             <TextView
                 android:id="@+id/locationText"
@@ -110,7 +120,7 @@
     </androidx.core.widget.NestedScrollView>
 
     <com.google.android.material.floatingactionbutton.FloatingActionButton
-        android:id="@+id/saveFab"
+        android:id="@+id/saveButton"
         android:layout_width="wrap_content"
         android:layout_height="wrap_content"
         android:layout_gravity="bottom|end"
