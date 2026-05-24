@@ -29,7 +29,7 @@ import io.github.jachimo.identifyeverything.util.GuidGenerator;
 public class ItemRepository extends ViewModel {
 
     private static final String TAG = "ItemRepository";
-    private static final String DEFAULT_SERVER_URL = "http://10.0.2.2:8000";
+    private static final String DEFAULT_SERVER_URL = "http://10.0.2.2:5000";
 
     private final AppDatabase database;
     private final ItemDao itemDao;
