@@ -13,6 +13,9 @@ public interface ItemDao {
     @Query("SELECT * FROM local_items WHERE guid = :guid AND deleted = 0 LIMIT 1")
     LiveData<Item> getGuid(String guid);
 
+    @Query("SELECT * FROM local_items WHERE item_id = :itemId AND deleted = 0 LIMIT 1")
+    LiveData<Item> getItemById(String itemId);
+
     @Query("SELECT * FROM local_items WHERE deleted = 0 ORDER BY createdAt DESC")
     LiveData<List<Item>> getAll();
 

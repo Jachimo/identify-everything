@@ -60,7 +60,7 @@ public class ItemRepository extends ViewModel {
 
     public void createItem(String guid, String url, String schemaType, String note) {
         viewModelScope.launch(Dispatchers.IO) {
-            database.itemDao().insert(Item.newItem(guid, url, schemaType));
+            database.itemDao().insert(Item.newLocalItem(guid, url, schemaType));
         };
     }
 
@@ -87,11 +87,12 @@ public class ItemRepository extends ViewModel {
 
     /**
      * Queue item creation for background sync
+     * TODO: Implement sync upload logic
      */
     public void queueCreate(String guid, String url, String schemaType, String note) {
         viewModelScope.launch(Dispatchers.IO) {
-            // TODO: Push to backend and queue sync
-            database.itemDao().insert(Item.newItem(guid, url, schemaType));
+            // Don't create locally yet until sync is implemented
+            // Backend will create item with UUID on first sync
         };
     }
 
@@ -171,6 +172,73 @@ public class ItemRepository extends ViewModel {
             if (!response.isSuccessful()) {
                 throw new IOException("HTTP " + response.code() + ": " + response.message());
             }
+        }
+    }
+
+    /**
+     * Backend sync response from GET /api/v1/ and sync/upload
+     */
+    private static class ItemDataDto {
+        String itemId;
+        String guid;
+        String url;
+        String domain;
+        String schemaType;
+        Object data;
+        String changeSummary;
+        String parentVersionId;
+        String createdAt;
+        String updatedAt;
+
+        public static ItemDataDto fromJson(JsonObject json) {
+            ItemDataDto dto = new ItemDataDto();
+            dto.itemId = json.has("item_id") ? json.get("item_id").getAsString() : null;
+            dto.guid = json.has("guid") ? json.get("guid").getAsString() : null;
+            dto.url = json.has("url") ? json.get("url").getAsString() : null;
+            dto.domain = json.has("domain") ? json.get("domain").getAsString() : null;
+            dto.schemaType = json.has("schema_type") ? json.get("schema_type").getAsString() : "generic";
+            dto.data = json.has("data") ? json.get("data") : null;
+            dto.changeSummary = json.has("change_summary") ? json.get("change_summary").getAsString() : null;
+            dto.parentVersionId = json.has("parent_version_id") ? json.get("parent_version_id").getAsString() : null;
+            dto.createdAt = json.has("created_at") ? json.get("created_at").getAsString() : null;
+            dto.updatedAt = json.has("updated_at") ? json.get("updated_at").getAsString() : null;
+            return dto;
+        }
+    }
+
+    /**
+     * URL structure for the backend
+     */
+    private String buildServerUrl() {
+        // TODO: Use environment variable or user config
+        // For MVP: auto-discover from "http://10.0.2.2:8000" in emulator
+        return System.getenv("SERVER_URL") != null
+            ? System.getenv("SERVER_URL")
+            : "http://10.0.2.2:8000";
+    }
+
+    /**
+     * Fetch specific item details from backend
+     * GET /api/v1/items/{guid}
+     */
+    public String getItemFromBackend(String guid) throws IOException {
+        String url = buildServerUrl() + "/api/v1/items/" + guid;
+
+        OkHttpClient client = new OkHttpClient.Builder()
+            .connectTimeout(30, TimeUnit.SECONDS)
+            .build();
+
+        Request request = new Request.Builder()
+            .url(url)
+            .header("X-Device-Id", deviceId)
+            .get()
+            .build();
+
+        try (Response response = client.newCall(request).execute()) {
+            if (!response.isSuccessful()) {
+                throw new IOException("HTTP " + response.code() + ": " + response.message());
+            }
+            return response.body().string();
         }
     }
 }

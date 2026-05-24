@@ -12,7 +12,9 @@ import java.util.Date;
 public class Item {
 
     @PrimaryKey
-    public String guid;  // Base26-encoded identifier
+    public String guid;  // Base26-encoded identifier (from user/QR code)
+
+    public String itemId;   // UUID (assigned by backend after first sync)
 
     public String url;   // https://{domain}/objects/v1/{guid}
 
@@ -23,17 +25,38 @@ public class Item {
     public Date createdAt;
     public Date deletedAt;
     public Date lastLocalSync;
+    public Date lastRemoteUpdated;
 
     /**
-     * Get non-deleted items sorted by creation date
+     * Create new item locally (guid assigned by user/QR)
      */
-    public static Item newItem(String guid, String url, String schemaType) {
+    public static Item newLocalItem(String guid, String url, String schemaType) {
         Item item = new Item();
         item.guid = guid;
         item.url = url;
         item.schemaType = schemaType;
         item.createdAt = new Date();
         item.deleted = false;
+        return item;
+    }
+
+    /**
+     * Create item after receiving from backend
+     */
+    public static Item newRemoteItem(
+        String guid,
+        String itemId,
+        String url,
+        String schemaType
+    ) {
+        Item item = new Item();
+        item.guid = guid;
+        item.itemId = itemId;
+        item.url = url;
+        item.schemaType = schemaType;
+        item.createdAt = new Date();
+        item.deleted = false;
+        item.lastRemoteUpdated = new Date();
         return item;
     }
 }
