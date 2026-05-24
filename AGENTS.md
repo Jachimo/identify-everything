@@ -364,6 +364,11 @@ cd android
 
 6. **No Production Secrets**: `SYNC_TOKEN_SECRET` environment variable must change in production. Docker Compose uses placeholder `your-super-secret-sync-token-change-in-production`.
 
+7. **Commit Authorship**: When AI assistant creates commits, include a Co-authored-by: line at the end of the commit message:
+   ```
+   Co-authored-by: GLM 4.7 Flash Heretic <noreply@venice.ai>
+   ```
+
 ## Configuration
 
 ### Environment Variables
