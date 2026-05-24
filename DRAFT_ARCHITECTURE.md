@@ -5,6 +5,7 @@
 * v0.0 - Initial version by GLM 4.7 Flash via Venice.ai
 * v0.1 - Partial human review (Sections 1 & 2)
 * v0.3 - Switch to Python + FastAPI stack (GLM 4.7 Flash Heretic)
+* v0.4 - Add local QR code generator specification (GLM 4.7 Flash Heretic)
 
 ## Overview
 
@@ -44,18 +45,25 @@ Key features:
 - Attachment storage (local disk or S3-compatible)
 - Built-in OpenAPI/Swagger documentation via FastAPI
 
-**Label Generator** (Python-based)
-- Generate QR codes with formatted URLs using python-qrcode
-- Batch label generation capability
-- Personalized labels (serial numbers, custom data)
-- Output for Avery labels (A4, 2x1") or thermal printers
-- Command-line interface: `python -m identify.labelgen --count=500 --format=avery`
+**Label Generator** (Python-based, local generation)
+- Generate QR codes on-demand using python-qrcode library
+- Batch generation from CSV files
+- Avery label support: 2" × 2", 12 labels per sheet (Avery 64510)
+- Three output formats: PNG (preview/debug), PDF (printing)
+- CLI interface: `python -m identify.labelgen --batch labels.csv --output labels/`
+- Fully offline-capable - no external dependencies or API calls
+
+For complete implementation specifications, refer to **[QR_GENERATOR.md](./QR_GENERATOR.md)** including:
+- Core Python API for programmatic use
+- CLI command flags and usage
+- Output format specifications
+- Testing strategies and performance characteristics
 
 #### Web Interface (Future)
 
 - Read-only search interface
 - Display item metadata and history
-- Manually upload attachments, select location, etc.
+- Upload attachments, select location, etc.
 
 ### 2. Data Model
 
@@ -208,22 +216,23 @@ QR codes are generated entirely offline using the `python-qrcode` library - no e
 
 Feature highlights:
 - **Complete offline functionality**: generate labels while air-gapped
-- **Three output formats**: PNG (preview/debug), SVG (vector), PDF (printing)
-- **Label formats**: Avery 2" × 0.75" (5160 format), 58mm/80mm thermal printers
+- **Avery 64510 format**: 2" × 2" labels, 12 per US Letter sheet
 - **Batch processing**: Generate from CSV file with arbitrary GUID/domain mapping
 - **CLI interface**: `python -m identify.labelgen --batch labels.csv --output labels/`
+- **Three output formats**: PNG (preview/debug), PDF (MVP), SVG (future)
 
 **Implementation details**:
 
 - Library: `python-qrcode` for encoding, `reportlab` for PDF generation, `Pillow` for image manipulation
-- QR code sizing configurable based on application needs (default: 256px)
+- QR code sizing configurable based on application needs (default: 320px for printed labels)
 - High error correction (ERROR_CORRECT_H) for durability against wear
 - Data validation ensures URLs/loc:// URIs are properly encoded
 - Generates directly to file or streams as base64-encoded data for web usage
+- PDF generates 12 labels per sheet (3 rows × 4 columns) with proper Avery 64510 spacing
 
 For complete implementation specifications, refer to **[QR_GENERATOR.md](./QR_GENERATOR.md)** including:
 - Core Python API for programmatic use
-- CLI command flags and usage
+- CLI command flags and usage (supports --size, --rows, --cols)
 - Output format specifications
 - Testing strategies and performance characteristics
 
@@ -506,8 +515,10 @@ Microservices + Event-driven architecture
 - Better conflict resolution UI
 - Per-item access control (multiple devices)
 - Peer-to-peer sync between clients
+- SVG output for better vector graphics
 
 **Long-term**:
+- Thermal printer support (58mm/80mm continuous labels)
 - Neural network for category prediction
 - OCR for scanning barcodes
 - GPS-based discovery (scan QR, nearby items displayed)
@@ -540,5 +551,5 @@ Microservices + Event-driven architecture
 - Users can scan QR code and view/edit item data offline
 - At least 50% of edits persist after lost data/device failure
 - Sync completes within 5 minutes for 100 changes
-- Label generation works for Avery and thermal printers
+- Label generation works for Avery 64510 (2" × 2", 12 per sheet)
 - Search works offline with full-text capabilities
