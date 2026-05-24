@@ -1,391 +1,272 @@
 # Identify Everything
 
-A mobile-first offline-first system for identifying items in the physical world using scannable QR codes that map to unique URLs. Developed as an MVP starting May 2024 for personal use and exploration of offline-sync capabilities.
+A mobile-first, offline-first system for identifying items in the
+physical world using scannable QR codes. 
 
-## Overview
+Each item is assigned a scannable identifier containing a unique URL,
+enabling phone-based viewing, editing, and tracking without internet
+connectivity.
 
-**The Problem**: When things are lost or misplaced, they often lack any meaningful context about what they are, when they were last used, or where they might be found.
-
-**The Solution**: Apply a scannable QR code to items. Scan with your phone to view or edit item details - see ownership, location, history, and attachments. Works completely offline if needed.
-
-[![Python Version](https://img.shields.io/badge/python-3.11-blue)](https://www.python.org/downloads/)
-[![Android](https://img.shields.io/badge/android-26%2B-green)](https://developer.android.com/)
-[![FastAPI](https://img.shields.io/badge/FastAPI-0.104+-0099CC)](https://fastapi.tiangolo.com/)
-[![License](https://img.shields.io/badge/license-proprietary-red.svg)]()
-[![MVP Scope](https://img.shields.io/badge/Status-MVP-yellow)]()
-
-## What This Project Does
+## Architecture
 
 ```
-┌──────────────────────────────────────────────────────────────┐
-│                     Identify Everything                       │
-│                                                                │
-│   ┌─────────────┐      ┌────────────────────────────────┐    │
-│   │  Scan QR    │ ───> │  View/Edit Item Details        │    │
-│   │  Code       │      │  - Title, description          │    │
-│   │             │      │  - Location (GPS)               │    │
-│   └─────────────┘      │  - Metadata, attachments        │    │
-│                        │  - Version history              │    │
-│                        └────────────────────────────────┘    │
-│                         ▲                                  │
-│                         │                                  │
-│   ┌─────────────────────┴────────────────────────────────┐   │
-│   │          Offline First Capability                    │   │
-│   │  - Local SQLite storage                            │   │
-│   │  - Background sync when online                     │   │
-│   │  - Conflict resolution (newer timestamps win)       │   │
-│   └────────────────────────────────────────────────────┘   │
-│                         │                                  │
-│                        Local                               │
-└────────────────────────────────────────────────────────────┘
+┌─────────────────┐         ┌──────────────────────────────────┐
+│  Mobile Client  │ ─────▶  │  Server (FastAPI + PostgreSQL)    │
+│  (Android)      │         │  - Items & version history        │
+│                 │         │  - Sync protocol (incremental)     │
+│  Local SQLite   │         │  - Full-text search               │
+│  + HTTP sync    │         │  - File attachments               │
+└─────────────────┘         └──────────────────────────────────┘
+         ▲                                                           
+         │ Offline-first data storage
+         │ Background sync when online
+         │ Conflict resolution via timestamps
+         │
+         │────────────────────────────────────┐
+         │                                    │
+  ┌──────┴────────────────────┐  ┌──────────┴────────────┐
+  │  QR code generator         │  │  Label sheets (MVP)   │
+  │  labelgen/                 │  │  Avery 64510 (2" × 2")│
+  │  - Single QR preview       │  │  12 per sheet         │
+  │  - Batch PDF generation    │  │  Desktop printing     │
+  │  - CSV batch import        │  │  Local generation     │
+  └────────────────────────────┘  └───────────────────────┘
 ```
 
 ## Components
 
-This project is organized as a monorepo with three main components:
+### 1. Backend Server (`server/`)
 
-### 1. Android App (`android/`)
-Android mobile client for scanning QR codes and managing item records locally.
-
-**Purpose**: Primary user interface for creating, editing, and syncing item data
+FastAPI-based REST API with PostgreSQL database. Central repository
+for item data, sync protocol enforcement, and API endpoints.
 
 **MVP Features**:
-- QR code scanning with CameraX and ZXing
-- Local SQLite database for offline-first storage
-- Version history tracking
-- GPS location tagging
-- Background sync when network available
-- Simple conflict resolution
-
-**Status**: Planned for implementation after label generator and backend are deployed
-
-**Documentation**: See [`android/README.md`](android/README.md)
-
-### 2. Backend Server (`server/`)
-FastAPI-based REST API and database layer for data synchronization.
-
-**Purpose**: Central repository for item data, sync protocol enforcement, and API endpoints
-
-**MVP Features**:
-- HTTP API with automatic OpenAPI documentation
-- PostgreSQL database via SQLAlchemy ORM
-- Version history and conflict resolution
+- REST API with OpenAPI documentation (`/docs`, `/redoc`)
+- PostgreSQL with SQLAlchemy ORM
+- Version history with timestamp-based conflict resolution
 - Incremental sync protocol
-- Attachment storage (local filesystem)
-- Full-text search
+- Attachment storage (local filesystem, 5MB limit)
+- Full-text search via PostgreSQL `tsvector`
 
-**Status**: Backend architecture defined, requires implementation
+**Status**: Architecture defined, requires implementation
 
-**Documentation**: See [`server/README.md`](server/README.md)
+**See**: [`server/README.md`](server/README.md)
 
-### 3. Label Generator (`labelgen/`)
-Local QR code generator for creating printable label sheets.
+### 2. Label Generator (`labelgen/`)
 
-**Purpose**: Generate QR codes from data and create printable labels
+Local QR code generator for printable label sheets. No external
+dependencies; works completely offline.
 
-**MVP Features**:
-- Local generation only (no external API dependencies)
-- Avery 64510 format (2" × 2", 12 labels per sheet)
-- Batch processing from CSV files
-- PNG preview, PDF printing, JSON data output
-- Completely offline-capable
+**Features**:
+- Single QR code preview (PNG) for development
+- Batch generation from CSV (Avery 64510: 2" × 2", 12 per sheet)
+- PNG preview, PDF generation, JSON data output
+- CLI interface: `python -m identify.labelgen --batch labels.csv --output sheet.pdf`
 
-**Status**: Fully specified and ready for implementation
+**MVP Scope v0.5** (locked May 24, 2026):
+- Fixed 2" × 2" Avery 64510 labels
+- 12 labels per 8.5" × 11" sheet
+- Desktop printer support only
+- **No thermal printing**
 
-**Documentation**: See [`labelgen/README.md`](labelgen/README.md) and [`QR_GENERATOR.md`](QR_GENERATOR.md)
+**Status**: Fully specified, ready for implementation
+
+**See**: [`labelgen/README.md`](labelgen/README.md), [`docs/QR_GENERATOR.md`](docs/QR_GENERATOR.md)
+
+### 3. Android App (`android/`)
+
+Mobile client for scanning QR codes and managing items offline. Planned for implementation after backend and label generator.
+
+**MVP Features (planned)**:
+- QR scanning with CameraX and ZXing
+- Local SQLite database for offline storage
+- Background sync when network available
+- GPS location tagging
+- Version history tracking
+
+**Status**: Planning phase
+
+**See**: [`android/README.md`](android/README.md)
 
 ## Project Structure
 
 ```
 identify-everything/
-├── android/                          # Android mobile app
-│   ├── app/
-│   │   └── src/main/
-│   │       ├── AndroidManifest.xml
-│   │       └── java/com/identify/Everything/
-│   ├── build.gradle
-│   └── README.md
-├── server/                           # Backend API & database
+├── server/                      # FastAPI backend
 │   ├── identify/
-│   │   ├── api/                      # FastAPI application
-│   │   ├── models/                   # SQLAlchemy models
-│   │   ├── schemas/                  # Pydantic schemas
-│   │   └── services/                 # Business logic
+│   │   ├── api/                 # Routers & route handlers
+│   │   ├── models/              # SQLAlchemy ORM models
+│   │   ├── schemas/             # Pydantic request/response
+│   │   ├── services/            # Business logic layer
+│   │   └── database.py          # Database engine/config
+│   ├── alembic/                 # Database migrations
 │   ├── requirements.txt
-│   ├── Dockerfile
-│   └── README.md
-├── labelgen/                         # QR code generator
+│   └── Dockerfile
+│
+├── labelgen/                    # QR code generator
 │   ├── identify/labelgen/
-│   │   ├── generator.py              # QR code generation logic
-│   │   ├── formats.py                # PDF/SVG formats
-│   │   └── cli.py                    # Command-line interface
-│   ├── scripts/
-│   │   └── generate_labels.py
-│   ├── examples/
-│   │   └── labels.csv
+│   │   ├── generator.py         # QR encoding
+│   │   ├── formats.py           # PDF/SVG output
+│   │   └── cli.py               # CLI interface
+│   ├── scripts/generate_labels.py
 │   ├── requirements.txt
-│   ├── Dockerfile
-│   └── README.md
-├── docker-compose.yml                # Development environment
-├── .github/workflows/                # CI/CD pipelines
-│   ├── backend.yaml                  # Backend tests
-│   └── label-generator.yaml          # Label generator tests
-├── .gitignore
-├── DRAFT_ARCHITECTURE.md             # Detailed architecture
-├── QR_GENERATOR.md                   # QR code generation spec
-└── README.md                         // This file
+│   └── Dockerfile
+│
+├── android/                     # Android client (Kotlin)
+│   ├── app/src/main/
+│   │   ├── AndroidManifest.xml
+│   │   └── java/com/identify/Everything/
+│   ├── build.gradle
+│   └── proguard-rules.pro
+│
+├── docs/                        # Architecture docs
+│   ├── DRAFT_ARCHITECTURE.md    # Complete system specification
+│   └── QR_GENERATOR.md          # Label generator spec
+│
+├── tests/                       # Test suites
+│   ├── backend/                 # Server API tests
+│   ├── label_generator/         # Generator tests
+│   └── android/                 # App tests (planned)
+│
+├── docker-compose.yml           # Dev environment (PostgreSQL)
+├── .github/workflows/           # CI/CD pipelines
+│   ├── backend.yaml             # Backend tests
+│   └── label-generator.yaml     # Generator tests
+│
+├── AGENTS.md                    # Agent implementation guide
+└── README.md                    # This file
 ```
 
 ## Data Model
 
 ### URL Format
 
-Item records identified by URLs:
+Items identified by scannable URLs:
 
 ```
 https://{domain}/objects/v1/{guid}
 ```
 
-- `{domain}` = User's DNS domain they own/control
-- `{guid}` = Base26-encoded unique identifier (28 characters)
-- Example: `https://mylabels.example.com/objects/v1/3k7x9b_p1j4_nv6d`
+- `{domain}`: User's DNS domain
+- `{guid}`: Base26-encoded ID (28 characters) — example: `3k7x9b_p1j4_nv6d_abc12_def3d_ghi4e_jkl5f`
 
-### GUID Generation
+See [`docs/DRAFT_ARCHITECTURE.md`](docs/DRAFT_ARCHITECTURE.md#3.-guid-generation) for Base26 encoding algorithm and schema details.
 
-Base26 encoding of UUIDs for scannability:
+**Version History**: Each change creates a new version with timestamps for conflict resolution. See [`docs/DRAFT_ARCHITECTURE.md`](docs/DRAFT_ARCHITECTURE.md#8。-item-version-history) for full schema.
 
-```
-UUID: 00000000-0000-0000-0000-000000000000
-Encoding: 3k7x9b_p1j4_nv6d_abc12_def3d_ghi4e_jkl5f
-```
-
-Full specification in [`DRAFT_ARCHITECTURE.md`](DRAFT_ARCHITECTURE.md#3.-guid-generation)
-
-### Item Version History
-
-Each change to an item creates a version:
-
-```sql
-item_versions {
-  version_id: UUID PRIMARY KEY,
-  item_id: UUID,
-  device_id: TEXT,                  -- Which device made the change
-  data: JSONB,                      -- Metadata
-  parent_version_id: UUID,          -- Links to previous version (chain)
-  created_at: TIMESTAMPTZ,           -- Timestamp for conflict resolution
-  is_canonical: BOOLEAN              -- Latest version for this device
-}
-```
-
-**Why version history?**
-- Never actually delete information, just create new versions
-- Audit trail of ownership and changes
-- Conflict resolution via timestamps and device attribution
-- Store attachments per version
-
-## Version History
-
-- **v0.5** (May 24, 2026) - Locked MVP scope: 2"x2" Avery 64510 labels, 12 per sheet, thermal printer support deferred
-- **v0.4** (May 23, 2026) - Added local QR code generator specification with python-qrcode library
-- **v0.3** (May 23, 2026) - Switched server stack from Node.js to Python + FastAPI with SQLAlchemy
-- **v0.1** - Initial architecture review after Section 1 & 2 updates
-
-**See DRAFT_ARCHITECTURE.md revision history for full changes**
-
-## Getting Started
-
-### Prerequisites
-
-**Basic**:
-- Python 3.11+
-- Docker & Docker Compose (for server testing)
-- Git
-
-**For Android development** (when implementing):
-- Android Studio Hedgehog (2023.1.1+) or newer
-- JDK 11+
-- Android SDK API 26+
-
-### Repository Setup
-
-**Clone repository**:
-
-```bash
-git clone https://github.com/your-username/identify-everything.git
-cd identify-everything
-```
-
-**Initialize local Replit** (recommended for development environment):
-
-1. Go to https://replit.com
-2. Click "Import Repl" → "Clone from Git"
-3. Paste: your GitHub repository URL
-4. Use the existing `.gitignore` and project structure
-
-### Component Implementation Order
-
-**Recommended order for implementation**:
-
-1. **Week 1: Label Generator** (easiest, no external dependencies)
-   ```bash
-   cd labelgen
-   pip install -r requirements.txt
-   python -m labelgen --batch examples/labels.csv --output test.pdf
-   ```
-
-2. **Week 2: Backend Server** (requires database)
-   ```bash
-   docker-compose up -d db
-   cd server
-   pip install -r requirements.txt
-   alembic upgrade head
-   uvicorn identify.api.main:app --reload
-   ```
-
-3. **Week 3: Android App** (most complex dependency chain)
-   ```bash
-   cd android
-   ./gradlew assembleDebug
-   # Connect Android device or start emulator
-   ./gradlew connectedAndroidTest
-   ```
-
-### Development Workflow
-
-With Replit + GitHub integration (your current setup):
+## Example URL
 
 ```
-1. I (AI assistant) implement features using Edit tool
-2. You review git diff against workspace
-3. You review and approve the changes
-4. You commit and push to GitHub if approved
-5. GitHub Actions triggers automated tests
-6. If tests pass: success: move to next feature
-7. If tests fail: I debug, fix, and iterate
+https://mylabels.example.com/objects/v1/3k7x9b_p1j4_nv6d_abc12_def3d_ghi4e_jkl5f
 ```
 
-**Quick start commands**:
+## Implementation Order
 
-```bash
-# Environment: Replit
-# Navigate to the directory in the workspace
-cd /home/jtuttle/ai_tools/identify-everything
+### 1. Label Generator (Week 1)
 
-# Start Docker services (database)
-docker-compose up -d db
-
-# Test backend connection
-curl http://localhost:5432
-
-# Run backend tests
-cd server && pytest tests/
-```
-
-### Label Generator (Starting Point)
-
-**Test the label generator**:
+Easiest entry point—local code, no external dependencies.
 
 ```bash
 cd labelgen
-
-# Generate preview PNG
-python -m labelgen \
+pip install python-qrcode[full] reportlab pillow
+python -m identify.labelgen \
     --data "https://mylabels.example.com/objects/v1/3k7x9b" \
     --output preview.png
-
-# Generate full sheet (Avery 64510)
-python -m labelgen \
-    --batch examples/labels.csv \
-    --output test_sheet.pdf \
-    --rows 3 --cols 4
 ```
 
-## Architecture Documentation
+See [`docs/QR_GENERATOR.md`](docs/QR_GENERATOR.md) for complete CLI API.
 
-- [`DRAFT_ARCHITECTURE.md`](DRAFT_ARCHITECTURE.md) - Complete architecture design
-  - Core components and data models
-  - Sync protocol specification
-  - Scaling considerations
-  - Future enhancements
-- [`QR_GENERATOR.md`](QR_GENERATOR.md) - Local QR code generator implementation
-  - Python API reference
-  - CLI interface design
-  - Testing strategy
-  - Performance characteristics
+### 2. Backend Server (Week 2)
+
+Requires database. PostgreSQL via Docker.
+
+```bash
+docker-compose up -d
+cd server
+pip install -r requirements.txt
+alembic upgrade head
+uvicorn identify.api.main:app --reload
+```
+
+API available at `http://localhost:8000` with docs at `/docs`.
+
+### 3. Android App (Week 3)
+
+Complex dependency chain. Use Android Studio.
+
+```bash
+cd android
+./gradlew assembleDebug
+./gradlew connectedAndroidTest
+```
 
 ## Testing
 
-### Label Generator Tests
+### Label Generator
 
 ```bash
 cd labelgen
 python -m pytest tests/ -v
+
+# With coverage
 python -m pytest tests/ --cov=labelgen --cov-report=html
 ```
 
-### Backend Tests
+### Backend
 
-GitHub Actions runs tests automatically on push/PR:
+```bash
+cd server
+pytest tests/
 
-```yaml
-# .github/workflows/backend.yaml
-# Runs pytest on Ubuntu and macOS with PostgreSQL service
+# With Docker database
+docker-compose up -d && pytest tests/
 ```
 
-### Android Tests (when implementing)
+GitHub Actions runs tests on push/PR.
+
+### Android
 
 ```bash
 cd android
-./gradlew test                     # Unit tests (no emulator)
-./gradlew connectedAndroidTest     # Instrumented tests
+./gradlew test                     # Unit tests
+./gradlew connectedAndroidTest     # Instrumented tests (device/emulator)
 ```
 
 ## Deployment (MVP)
 
-**Scalable targeting**: 10-20 concurrent users on a small VPS
+**Target**: 10-20 concurrent users on a small VPS.
 
-**Recommended stack**:
-- **Backend**: 1 vCPU, 2GB RAM, PostgreSQL + FastAPI (Docker)
-- **Storage**: Local filesystem (5MB per attachment limit)
-- **Network**: Beginner-friendly VPS provider (Linode, DigitalOcean, Vultr)
-- **Domains**: User-managed DNS domains
+**Recommended Stack**:
+- Backend: 1 vCPU, 2GB RAM, PostgreSQL + FastAPI (Docker)
+- Storage: Local filesystem (5MB per attachment limit)
+- VPS Provider: DigitalOcean, Linode, or Vultr
+- DNS: User-managed domains
 
-No load balancers or microservices required for MVP.
-
-### Docker Deployment
+No load balancers, microservices, or caching needed for MVP.
 
 ```bash
-# Build and start in production
 docker-compose up -d --build
-
-# View logs
 docker-compose logs -f
-
-# Stop
 docker-compose down
 ```
 
-## Changing Project Approach
-
-**Scalable paths** (detected later, post-MVP):
-
-1. **Microservices**: Separate backend into API, sync, storage services
-2. **Horizontal scaling**: Add read replicas, CDN, load balancers
-3. **Dedicated services**: Replace local file storage with cloud object storage
-4. **Peer-to-peer**: Merge offline-first clients with sync servers
-
-None of these needed for MVP (10-20 users).
-
 ## Contributing
 
-This is a personal project for now. The structure is designed for clarity and future team collaboration.
+This is currently a personal project. The structure is designed for clarity and future team collaboration.
 
-**Future team entry points**:
-1. Fork this repository
-2. Pick a component from the README
-3. Follow its README.md for context
-4. Run tests locally before opening PR
+**Future contributors**: Fork, pick a component, read its README, run tests locally.
+
+## Documentation
+
+| File | Purpose |
+|------|---------|
+| [`docs/DRAFT_ARCHITECTURE.md`](docs/DRAFT_ARCHITECTURE.md) | Complete system architecture, data models, sync protocol, scaling suggestions |
+| [`docs/QR_GENERATOR.md`](docs/QR_GENERATOR.md) | Label generator specifications, CLI API, testing strategy |
+| [`server/README.md`](server/README.md) | Backend implementation guide |
+| [`labelgen/README.md`](labelgen/README.md) | Label generator usage guide |
+| [`android/README.md`](android/README.md) | Android app implementation guide |
+| [`AGENTS.md`](AGENTS.md) | Technical details for AI agents | working_dir>/home/jtuttle/ai_tools/identify-everything
 
 ## License
 
-Proprietary - All rights reserved
+Proprietary — All rights reserved
