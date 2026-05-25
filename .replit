@@ -1,4 +1,4 @@
-modules = ["python-3.11", "nodejs-20"]
+modules = ["python-3.11", "java-graalvm22.3"]
 [agent]
 expertMode = true
 stack = "BEST_EFFORT_FALLBACK"
@@ -35,17 +35,6 @@ args = "PYTHONPATH=server python main.py"
 waitForPort = 5000
 
 [workflows.workflow.metadata]
-outputType = "webview"
-
-[[workflows.workflow]]
-name = "Expo Dev Server"
-mode = "sequential"
-
-[[workflows.workflow.tasks]]
-task = "shell.exec"
-args = "cd mobile && npx expo start"
-
-[[workflows.workflow.metadata]]
 outputType = "webview"
 
 [[ports]]
