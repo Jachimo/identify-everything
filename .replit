@@ -35,12 +35,12 @@ name = "Start application"
 author = "agent"
 
 [workflows.workflow.metadata]
-outputType = "webview"
+outputType = "console"
 
 [[workflows.workflow.tasks]]
 task = "shell.exec"
-args = "cd mobile && npx expo start --web --port 5000"
-waitForPort = 5000
+args = "cd mobile && REACT_NATIVE_PACKAGER_HOSTNAME=cfaf5f01-abd5-4d28-98f0-6f1f7f35aa1e-00-1mkpte7wuxrb8.worf.replit.dev npx expo start --port 8080"
+waitForPort = 8080
 
 [[workflows.workflow]]
 name = "Backend API"
@@ -63,8 +63,8 @@ localPort = 8000
 externalPort = 8000
 
 [[ports]]
-localPort = 8082
-externalPort = 3000
+localPort = 8080
+externalPort = 8080
 
 [deployment]
 deploymentTarget = "autoscale"
