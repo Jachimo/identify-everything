@@ -39,7 +39,7 @@ outputType = "console"
 
 [[workflows.workflow.tasks]]
 task = "shell.exec"
-args = "cd mobile && REACT_NATIVE_PACKAGER_HOSTNAME=cfaf5f01-abd5-4d28-98f0-6f1f7f35aa1e-00-1mkpte7wuxrb8.worf.replit.dev npx expo start --port 8080"
+args = "cd mobile && REACT_NATIVE_PACKAGER_HOSTNAME=$REPLIT_EXPO_DEV_DOMAIN EXPO_PACKAGER_PROXY_URL=https://$REPLIT_EXPO_DEV_DOMAIN npx expo start --port 8080"
 waitForPort = 8080
 
 [[workflows.workflow]]

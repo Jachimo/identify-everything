@@ -1,0 +1,1 @@
+- [Expo native mode on Replit](expo-replit-native.md) — use REPLIT_EXPO_DEV_DOMAIN (not REPLIT_DEV_DOMAIN) + EXPO_PACKAGER_PROXY_URL for Android emulator preview; port 8080, no --web.
