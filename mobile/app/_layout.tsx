@@ -10,7 +10,6 @@ export default function RootLayout() {
   const [ready, setReady] = useState(false);
 
   useEffect(() => {
-    // Small delay to ensure fonts/assets load
     setTimeout(() => {
       setReady(true);
       SplashScreen.hideAsync();
@@ -30,8 +29,16 @@ export default function RootLayout() {
       <Stack>
         <Stack.Screen name="(tabs)" options={{ headerShown: false }} />
         <Stack.Screen
+          name="scan"
+          options={{ title: "Scan QR Code", headerShown: false }}
+        />
+        <Stack.Screen
           name="details/[guid]"
           options={{ title: "Item Details", headerBackTitle: "Back" }}
+        />
+        <Stack.Screen
+          name="settings"
+          options={{ title: "Settings", headerBackTitle: "Back" }}
         />
       </Stack>
       <StatusBar style="auto" />

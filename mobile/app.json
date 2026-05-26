@@ -45,7 +45,10 @@
         {
           "locationAlwaysAndWhenInUsePermission": "Allow Identify Everything to use your location for item tracking."
         }
-      ]
+      ],
+      "expo-asset",
+      "expo-font",
+      "expo-barcode-scanner"
     ],
     "experiments": {
       "typedRoutes": true

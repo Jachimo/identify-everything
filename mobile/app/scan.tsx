@@ -1,101 +1,197 @@
 import { useRouter } from "expo-router";
-import { useState } from "react";
-import { View, Text, StyleSheet, TouchableOpacity } from "react-native";
+import { useState, useEffect, useRef } from "react";
+import { View, Text, StyleSheet, TouchableOpacity, Alert } from "react-native";
+import { CameraView, useCameraPermissions } from "expo-camera";
 import { Ionicons } from "@expo/vector-icons";
+import { isValidGuid, normalizeGuid } from "../src/sync/guid";
 
 export default function ScanScreen() {
   const router = useRouter();
-  const [scanning, setScanning] = useState(false);
-  const [scanned, setScanned] = useState<string | null>(null);
+  const [permission, requestPermission] = useCameraPermissions();
+  const [scanned, setScanned] = useState(false);
+  const cooldown = useRef(false);
 
-  const handleBarCodeScanned = ({ data }: { data: string }) => {
-    if (scanned) return;
-    setScanned(data);
-    router.replace(`/details/${encodeURIComponent(data)}`);
-  };
-
-  if (scanning) {
-    // In a real Expo build with expo-camera, we'd render a Camera view here.
-    // For now, show a manual entry fallback.
+  if (!permission) {
     return (
-      <View style={styles.container}>
-        <Text style={styles.text}>
-          QR scanner requires a physical device or Expo Go.
-        </Text>
-        <Text style={styles.hint}>
-          Go back and enter the GUID manually.
-        </Text>
-        <TouchableOpacity
-          style={styles.button}
-          onPress={() => router.back()}
-        >
-          <Text style={styles.buttonText}>Go Back</Text>
+      <View style={styles.centered}>
+        <Text style={styles.text}>Checking camera permission…</Text>
+      </View>
+    );
+  }
+
+  if (!permission.granted) {
+    return (
+      <View style={styles.centered}>
+        <Ionicons name="camera-off-outline" size={64} color="#ccc" />
+        <Text style={styles.text}>Camera access is required to scan QR codes.</Text>
+        <TouchableOpacity style={styles.button} onPress={requestPermission}>
+          <Text style={styles.buttonText}>Grant Permission</Text>
+        </TouchableOpacity>
+        <TouchableOpacity style={styles.link} onPress={() => router.back()}>
+          <Text style={styles.linkText}>Go Back</Text>
         </TouchableOpacity>
       </View>
     );
   }
 
+  const handleBarCodeScanned = ({ data }: { data: string }) => {
+    if (cooldown.current) return;
+    cooldown.current = true;
+
+    let guid = data.trim();
+
+    // Strip URL prefix if the QR code contains a full URL
+    const match = guid.match(/\/objects\/v1\/([a-p0-9_]{16,19})$/i);
+    if (match) guid = match[1];
+
+    const normalized = normalizeGuid(guid);
+    if (normalized) {
+      setScanned(true);
+      router.replace(`/details/${encodeURIComponent(normalized)}`);
+    } else {
+      Alert.alert(
+        "Not an item QR code",
+        `Scanned: ${data}\n\nThis doesn't look like a valid item GUID.`,
+        [{ text: "Try Again", onPress: () => { cooldown.current = false; } }]
+      );
+    }
+  };
+
   return (
     <View style={styles.container}>
-      <Ionicons name="camera-outline" size={80} color="#1976D2" />
-      <Text style={styles.text}>Scan an Item QR Code</Text>
-      <TouchableOpacity
-        style={styles.button}
-        onPress={() => setScanning(true)}
-      >
-        <Ionicons name="scan" size={20} color="#fff" />
-        <Text style={styles.buttonText}>Start Scanning</Text>
-      </TouchableOpacity>
-      <TouchableOpacity
-        style={styles.link}
-        onPress={() => router.back()}
-      >
-        <Text style={styles.linkText}>Enter GUID manually</Text>
-      </TouchableOpacity>
+      <CameraView
+        style={StyleSheet.absoluteFillObject}
+        facing="back"
+        barcodeScannerSettings={{ barcodeTypes: ["qr"] }}
+        onBarcodeScanned={scanned ? undefined : handleBarCodeScanned}
+      />
+
+      <View style={styles.overlay}>
+        <View style={styles.topBar}>
+          <TouchableOpacity style={styles.backButton} onPress={() => router.back()}>
+            <Ionicons name="arrow-back" size={24} color="#fff" />
+            <Text style={styles.backText}>Cancel</Text>
+          </TouchableOpacity>
+        </View>
+
+        <View style={styles.scanArea}>
+          <View style={styles.corner} />
+          <View style={[styles.corner, styles.cornerTopRight]} />
+          <View style={[styles.corner, styles.cornerBottomLeft]} />
+          <View style={[styles.corner, styles.cornerBottomRight]} />
+        </View>
+
+        <View style={styles.bottomBar}>
+          <Text style={styles.hint}>Point the camera at an item QR code</Text>
+        </View>
+      </View>
     </View>
   );
 }
 
+const CORNER = 32;
+const BORDER = 4;
+
 const styles = StyleSheet.create({
   container: {
     flex: 1,
+    backgroundColor: "#000",
+  },
+  centered: {
+    flex: 1,
     justifyContent: "center",
     alignItems: "center",
-    padding: 24,
+    padding: 32,
     backgroundColor: "#f5f5f5",
   },
   text: {
-    fontSize: 18,
+    fontSize: 16,
     color: "#333",
+    textAlign: "center",
     marginTop: 16,
     marginBottom: 24,
-    textAlign: "center",
-  },
-  hint: {
-    fontSize: 14,
-    color: "#999",
-    textAlign: "center",
-    marginBottom: 16,
   },
   button: {
-    flexDirection: "row",
     backgroundColor: "#1976D2",
     paddingVertical: 14,
     paddingHorizontal: 32,
     borderRadius: 8,
-    alignItems: "center",
-    gap: 8,
+    marginBottom: 12,
   },
   buttonText: {
     color: "#fff",
     fontSize: 16,
     fontWeight: "600",
   },
-  link: {
-    marginTop: 20,
+  link: { marginTop: 8 },
+  linkText: { color: "#1976D2", fontSize: 14 },
+
+  overlay: {
+    ...StyleSheet.absoluteFillObject,
+    justifyContent: "space-between",
   },
-  linkText: {
-    color: "#1976D2",
+  topBar: {
+    paddingTop: 56,
+    paddingHorizontal: 16,
+    backgroundColor: "rgba(0,0,0,0.5)",
+  },
+  backButton: {
+    flexDirection: "row",
+    alignItems: "center",
+    gap: 8,
+    paddingVertical: 8,
+  },
+  backText: { color: "#fff", fontSize: 16 },
+
+  scanArea: {
+    alignSelf: "center",
+    width: 240,
+    height: 240,
+    position: "relative",
+  },
+  corner: {
+    position: "absolute",
+    top: 0,
+    left: 0,
+    width: CORNER,
+    height: CORNER,
+    borderTopWidth: BORDER,
+    borderLeftWidth: BORDER,
+    borderColor: "#fff",
+  },
+  cornerTopRight: {
+    left: undefined,
+    right: 0,
+    borderLeftWidth: 0,
+    borderRightWidth: BORDER,
+  },
+  cornerBottomLeft: {
+    top: undefined,
+    bottom: 0,
+    borderTopWidth: 0,
+    borderBottomWidth: BORDER,
+  },
+  cornerBottomRight: {
+    top: undefined,
+    bottom: 0,
+    left: undefined,
+    right: 0,
+    borderTopWidth: 0,
+    borderLeftWidth: 0,
+    borderRightWidth: BORDER,
+    borderBottomWidth: BORDER,
+  },
+
+  bottomBar: {
+    paddingBottom: 48,
+    paddingHorizontal: 32,
+    backgroundColor: "rgba(0,0,0,0.5)",
+    alignItems: "center",
+    paddingTop: 16,
+  },
+  hint: {
+    color: "#fff",
     fontSize: 14,
+    textAlign: "center",
   },
 });

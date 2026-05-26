@@ -1,4 +1,4 @@
-modules = ["python-3.11", "java-graalvm22.3"]
+modules = ["java-graalvm22.3", "nodejs-20", "python-3.11"]
 run = "PYTHONPATH=server python main.py"
 [agent]
 expertMode = true
@@ -26,24 +26,45 @@ author = "agent"
 task = "workflow.run"
 args = "Start application"
 
+[[workflows.workflow.tasks]]
+task = "workflow.run"
+args = "Backend API"
+
 [[workflows.workflow]]
 name = "Start application"
+author = "agent"
+
+[workflows.workflow.metadata]
+outputType = "webview"
+
+[[workflows.workflow.tasks]]
+task = "shell.exec"
+args = "cd mobile && npx expo start --web --port 5000"
+waitForPort = 5000
+
+[[workflows.workflow]]
+name = "Backend API"
 author = "agent"
 
 [[workflows.workflow.tasks]]
 task = "shell.exec"
 args = "PYTHONPATH=server python main.py"
-waitForPort = 5000
+waitForPort = 8000
 
 [workflows.workflow.metadata]
-outputType = "webview"
+outputType = "console"
 
 [[ports]]
 localPort = 5000
 externalPort = 80
 
 [[ports]]
-localPort = 8081
+localPort = 8000
+externalPort = 8000
+
+[[ports]]
+localPort = 8082
+externalPort = 3000
 
 [deployment]
 deploymentTarget = "autoscale"

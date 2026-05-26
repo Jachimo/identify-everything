@@ -49,7 +49,13 @@ export async function getDeviceId(): Promise<string> {
 // Server URL
 export async function getServerUrl(): Promise<string> {
   const url = await getItem(STORAGE_KEY_SERVER_URL);
-  return url || "http://10.0.2.2:5000";
+  if (url) return url;
+  // On web, default to same origin (works in Replit and browser previews)
+  if (typeof window !== "undefined" && window.location) {
+    return `${window.location.protocol}//${window.location.hostname}:8000`;
+  }
+  // On Android emulator, 10.0.2.2 routes to the host machine's localhost
+  return "http://10.0.2.2:8000";
 }
 
 export async function setServerUrl(url: string): Promise<void> {
