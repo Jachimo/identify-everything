@@ -3,6 +3,7 @@ import { StatusBar } from "expo-status-bar";
 import { useEffect, useState } from "react";
 import { ActivityIndicator, View } from "react-native";
 import * as SplashScreen from "expo-splash-screen";
+import { startSyncManager, stopSyncManager } from "../src/sync/sync-manager";
 
 SplashScreen.preventAutoHideAsync();
 
@@ -14,6 +15,9 @@ export default function RootLayout() {
       setReady(true);
       SplashScreen.hideAsync();
     }, 100);
+
+    startSyncManager();
+    return () => stopSyncManager();
   }, []);
 
   if (!ready) {

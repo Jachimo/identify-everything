@@ -17,7 +17,14 @@
       "adaptiveIcon": {
         "foregroundImage": "./assets/images/adaptive-icon.png",
         "backgroundColor": "#1976D2"
-      }
+      },
+      "permissions": [
+        "CAMERA",
+        "ACCESS_FINE_LOCATION",
+        "ACCESS_COARSE_LOCATION",
+        "READ_EXTERNAL_STORAGE",
+        "WRITE_EXTERNAL_STORAGE"
+      ]
     },
     "web": {
       "bundler": "metro",
@@ -37,13 +44,20 @@
       [
         "expo-camera",
         {
-          "cameraPermission": "Allow Identify Everything to scan QR codes."
+          "cameraPermission": "Allow Identify Everything to scan QR codes and take photos of items."
         }
       ],
       [
         "expo-location",
         {
           "locationAlwaysAndWhenInUsePermission": "Allow Identify Everything to use your location for item tracking."
+        }
+      ],
+      [
+        "expo-image-picker",
+        {
+          "photosPermission": "Allow Identify Everything to access your photos for item records.",
+          "cameraPermission": "Allow Identify Everything to take photos of items."
         }
       ],
       "expo-asset",

@@ -76,6 +76,22 @@ def upload_attachment(
     return AttachmentOut.model_validate(attachment)
 
 
+@router.get("/{guid}/attach/{attachment_id}")
+def download_attachment(guid: str, attachment_id: str, db: Session = Depends(get_db)):
+    attachment = db.query(Attachment).filter(Attachment.attachment_id == attachment_id).first()
+    if not attachment:
+        raise HTTPException(status_code=404, detail="ATTACHMENT_NOT_FOUND")
+    from pathlib import Path
+    path = Path(attachment.file_path)
+    if not path.exists():
+        raise HTTPException(status_code=404, detail="FILE_NOT_FOUND")
+    return FileResponse(
+        str(path),
+        media_type=attachment.mime_type or "application/octet-stream",
+        filename=attachment.filename,
+    )
+
+
 @router.get("/{guid}/version/{vid}/attachments", response_model=list[AttachmentOut])
 def list_attachments(guid: str, vid: str, db: Session = Depends(get_db)):
     attachments = db.query(Attachment).filter(Attachment.version_id == vid).all()

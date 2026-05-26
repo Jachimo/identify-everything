@@ -1,9 +1,10 @@
 import { useRouter } from "expo-router";
-import { useState, useEffect, useRef } from "react";
+import { useState, useRef } from "react";
 import { View, Text, StyleSheet, TouchableOpacity, Alert } from "react-native";
 import { CameraView, useCameraPermissions } from "expo-camera";
+import * as Location from "expo-location";
 import { Ionicons } from "@expo/vector-icons";
-import { isValidGuid, normalizeGuid } from "../src/sync/guid";
+import { normalizeGuid } from "../src/sync/guid";
 
 export default function ScanScreen() {
   const router = useRouter();
@@ -34,27 +35,52 @@ export default function ScanScreen() {
     );
   }
 
-  const handleBarCodeScanned = ({ data }: { data: string }) => {
+  const handleBarCodeScanned = async ({ data }: { data: string }) => {
     if (cooldown.current) return;
     cooldown.current = true;
 
     let guid = data.trim();
-
-    // Strip URL prefix if the QR code contains a full URL
     const match = guid.match(/\/objects\/v1\/([a-p0-9_]{16,19})$/i);
     if (match) guid = match[1];
 
     const normalized = normalizeGuid(guid);
-    if (normalized) {
-      setScanned(true);
-      router.replace(`/details/${encodeURIComponent(normalized)}`);
-    } else {
+    if (!normalized) {
       Alert.alert(
         "Not an item QR code",
         `Scanned: ${data}\n\nThis doesn't look like a valid item GUID.`,
         [{ text: "Try Again", onPress: () => { cooldown.current = false; } }]
       );
+      return;
     }
+
+    setScanned(true);
+
+    // Capture GPS location in background (non-blocking)
+    let latParam = "";
+    let lngParam = "";
+    let accParam = "";
+    try {
+      const { status } = await Location.requestForegroundPermissionsAsync();
+      if (status === "granted") {
+        const loc = await Location.getCurrentPositionAsync({
+          accuracy: Location.Accuracy.Balanced,
+          timeInterval: 5000,
+        });
+        latParam = String(loc.coords.latitude);
+        lngParam = String(loc.coords.longitude);
+        accParam = String(loc.coords.accuracy ?? "");
+      }
+    } catch {
+      // Location unavailable — proceed without it
+    }
+
+    const params = new URLSearchParams();
+    if (latParam) params.set("lat", latParam);
+    if (lngParam) params.set("lng", lngParam);
+    if (accParam) params.set("acc", accParam);
+    const qs = params.toString() ? `?${params.toString()}` : "";
+
+    router.replace(`/details/${encodeURIComponent(normalized)}${qs}`);
   };
 
   return (
@@ -93,10 +119,7 @@ const CORNER = 32;
 const BORDER = 4;
 
 const styles = StyleSheet.create({
-  container: {
-    flex: 1,
-    backgroundColor: "#000",
-  },
+  container: { flex: 1, backgroundColor: "#000" },
   centered: {
     flex: 1,
     justifyContent: "center",
@@ -118,18 +141,10 @@ const styles = StyleSheet.create({
     borderRadius: 8,
     marginBottom: 12,
   },
-  buttonText: {
-    color: "#fff",
-    fontSize: 16,
-    fontWeight: "600",
-  },
+  buttonText: { color: "#fff", fontSize: 16, fontWeight: "600" },
   link: { marginTop: 8 },
   linkText: { color: "#1976D2", fontSize: 14 },
-
-  overlay: {
-    ...StyleSheet.absoluteFillObject,
-    justifyContent: "space-between",
-  },
+  overlay: { ...StyleSheet.absoluteFillObject, justifyContent: "space-between" },
   topBar: {
     paddingTop: 56,
     paddingHorizontal: 16,
@@ -142,7 +157,6 @@ const styles = StyleSheet.create({
     paddingVertical: 8,
   },
   backText: { color: "#fff", fontSize: 16 },
-
   scanArea: {
     alignSelf: "center",
     width: 240,
@@ -181,7 +195,6 @@ const styles = StyleSheet.create({
     borderRightWidth: BORDER,
     borderBottomWidth: BORDER,
   },
-
   bottomBar: {
     paddingBottom: 48,
     paddingHorizontal: 32,
@@ -189,9 +202,5 @@ const styles = StyleSheet.create({
     alignItems: "center",
     paddingTop: 16,
   },
-  hint: {
-    color: "#fff",
-    fontSize: 14,
-    textAlign: "center",
-  },
+  hint: { color: "#fff", fontSize: 14, textAlign: "center" },
 });

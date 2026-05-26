@@ -1,4 +1,4 @@
-import { useCallback, useState } from "react";
+import { useCallback, useState, useEffect } from "react";
 import { useFocusEffect, useRouter } from "expo-router";
 import {
   View,
@@ -10,13 +10,18 @@ import {
 } from "react-native";
 import { Ionicons } from "@expo/vector-icons";
 import { ItemData } from "../../src/types";
-import { getAllItems, getUnsyncedItems, getDeviceId } from "../../src/sync/storage";
-import { uploadSync } from "../../src/sync/api";
+import { getAllItems } from "../../src/sync/storage";
+import {
+  performSync,
+  addSyncListener,
+  getSyncStatus,
+  SyncStatus,
+} from "../../src/sync/sync-manager";
 
 export default function ItemsScreen() {
   const router = useRouter();
   const [items, setItems] = useState<ItemData[]>([]);
-  const [syncing, setSyncing] = useState(false);
+  const [syncStatus, setSyncStatus] = useState<SyncStatus>(getSyncStatus());
 
   useFocusEffect(
     useCallback(() => {
@@ -24,31 +29,18 @@ export default function ItemsScreen() {
     }, [])
   );
 
+  useEffect(() => {
+    const unsub = addSyncListener(setSyncStatus);
+    return unsub;
+  }, []);
+
   const handleSync = async () => {
-    setSyncing(true);
     try {
-      const unsynced = await getUnsyncedItems();
-      if (unsynced.length === 0) {
-        Alert.alert("Sync", "All items are already synced.");
-        setSyncing(false);
-        return;
-      }
-
-      const versions = unsynced.map((item) => ({
-        item_id: item.itemId || item.guid,
-        guid: item.guid,
-        url: item.url,
-        domain: item.domain,
-      }));
-
-      const result = await uploadSync(versions);
-      // Re-fetch items after sync
-      await getAllItems().then(setItems);
-      Alert.alert("Sync Complete", `Uploaded ${result.processed} item(s).`);
+      await performSync();
+      const refreshed = await getAllItems();
+      setItems(refreshed);
     } catch (e: any) {
       Alert.alert("Sync Failed", e.message);
-    } finally {
-      setSyncing(false);
     }
   };
 
@@ -66,9 +58,13 @@ export default function ItemsScreen() {
             {item.title}
           </Text>
         ) : null}
-        <Text style={styles.itemUrl} numberOfLines={1}>
-          {item.url}
-        </Text>
+        {item.location ? (
+          <Text style={styles.itemLocation} numberOfLines={1}>
+            <Ionicons name="location" size={11} color="#1976D2" />{" "}
+            {item.location.latitude.toFixed(4)},{" "}
+            {item.location.longitude.toFixed(4)}
+          </Text>
+        ) : null}
       </View>
       <View style={styles.itemBadge}>
         {!item.synced && (
@@ -81,25 +77,57 @@ export default function ItemsScreen() {
     </TouchableOpacity>
   );
 
+  const hasPending = syncStatus.pendingItems > 0 || syncStatus.pendingPhotos > 0;
+
   return (
     <View style={styles.container}>
-      <View style={styles.header}>
-        <Text style={styles.count}>{items.length} item(s)</Text>
+      {/* Sync status bar */}
+      <View style={styles.syncBar}>
+        <View style={styles.syncInfo}>
+          {syncStatus.running ? (
+            <View style={styles.syncRow}>
+              <Ionicons name="sync" size={14} color="#1976D2" />
+              <Text style={styles.syncText}>Syncing…</Text>
+            </View>
+          ) : hasPending ? (
+            <View style={styles.syncRow}>
+              <Ionicons name="cloud-upload-outline" size={14} color="#E65100" />
+              <Text style={[styles.syncText, { color: "#E65100" }]}>
+                {syncStatus.pendingItems} item(s), {syncStatus.pendingPhotos} photo(s) pending
+              </Text>
+            </View>
+          ) : (
+            <View style={styles.syncRow}>
+              <Ionicons name="cloud-done" size={14} color="#4CAF50" />
+              <Text style={[styles.syncText, { color: "#4CAF50" }]}>
+                {syncStatus.lastSync
+                  ? `Synced ${new Date(syncStatus.lastSync).toLocaleTimeString()}`
+                  : "All synced"}
+              </Text>
+            </View>
+          )}
+          <Text style={styles.countText}>{items.length} item(s)</Text>
+        </View>
         <TouchableOpacity
-          style={[styles.syncButton, syncing && styles.syncButtonDisabled]}
+          style={[styles.syncButton, syncStatus.running && styles.syncButtonDisabled]}
           onPress={handleSync}
-          disabled={syncing}
+          disabled={syncStatus.running}
         >
-          <Ionicons
-            name={syncing ? "sync" : "cloud-upload"}
-            size={18}
-            color="#fff"
-          />
+          <Ionicons name="sync" size={16} color="#fff" />
           <Text style={styles.syncButtonText}>
-            {syncing ? "Syncing..." : "Sync"}
+            {syncStatus.running ? "Syncing…" : "Sync Now"}
           </Text>
         </TouchableOpacity>
       </View>
+
+      {syncStatus.lastError && (
+        <View style={styles.errorBar}>
+          <Ionicons name="warning-outline" size={14} color="#C62828" />
+          <Text style={styles.errorText} numberOfLines={1}>
+            {syncStatus.lastError}
+          </Text>
+        </View>
+      )}
 
       {items.length === 0 ? (
         <View style={styles.empty}>
@@ -115,6 +143,8 @@ export default function ItemsScreen() {
           keyExtractor={(item) => item.guid}
           renderItem={renderItem}
           contentContainerStyle={styles.list}
+          onRefresh={() => getAllItems().then(setItems)}
+          refreshing={false}
         />
       )}
     </View>
@@ -122,43 +152,46 @@ export default function ItemsScreen() {
 }
 
 const styles = StyleSheet.create({
-  container: {
-    flex: 1,
-    backgroundColor: "#f5f5f5",
-  },
-  header: {
+  container: { flex: 1, backgroundColor: "#f5f5f5" },
+
+  syncBar: {
     flexDirection: "row",
     justifyContent: "space-between",
     alignItems: "center",
-    padding: 16,
+    paddingHorizontal: 16,
+    paddingVertical: 10,
     backgroundColor: "#fff",
     borderBottomWidth: 1,
     borderBottomColor: "#e0e0e0",
   },
-  count: {
-    fontSize: 14,
-    color: "#666",
-  },
+  syncInfo: { flex: 1, gap: 2 },
+  syncRow: { flexDirection: "row", alignItems: "center", gap: 6 },
+  syncText: { fontSize: 12, color: "#1976D2" },
+  countText: { fontSize: 11, color: "#999" },
   syncButton: {
     flexDirection: "row",
     backgroundColor: "#1976D2",
-    paddingVertical: 8,
-    paddingHorizontal: 16,
+    paddingVertical: 7,
+    paddingHorizontal: 14,
     borderRadius: 6,
     alignItems: "center",
     gap: 6,
+    marginLeft: 12,
   },
-  syncButtonDisabled: {
-    opacity: 0.6,
+  syncButtonDisabled: { opacity: 0.6 },
+  syncButtonText: { color: "#fff", fontSize: 13, fontWeight: "600" },
+
+  errorBar: {
+    flexDirection: "row",
+    alignItems: "center",
+    gap: 6,
+    backgroundColor: "#FFEBEE",
+    paddingHorizontal: 16,
+    paddingVertical: 6,
   },
-  syncButtonText: {
-    color: "#fff",
-    fontSize: 14,
-    fontWeight: "600",
-  },
-  list: {
-    padding: 12,
-  },
+  errorText: { color: "#C62828", fontSize: 12, flex: 1 },
+
+  list: { padding: 12 },
   itemRow: {
     flexDirection: "row",
     backgroundColor: "#fff",
@@ -167,39 +200,24 @@ const styles = StyleSheet.create({
     marginBottom: 8,
     alignItems: "center",
   },
-  itemInfo: {
-    flex: 1,
-  },
+  itemInfo: { flex: 1 },
   itemGuid: {
     fontSize: 14,
     fontWeight: "600",
     fontFamily: "monospace",
     color: "#333",
   },
-  itemTitle: {
-    fontSize: 13,
-    color: "#666",
-    marginTop: 2,
-  },
-  itemUrl: {
-    fontSize: 11,
-    color: "#999",
-    marginTop: 2,
-  },
-  itemBadge: {
-    marginLeft: 8,
-  },
+  itemTitle: { fontSize: 13, color: "#555", marginTop: 2 },
+  itemLocation: { fontSize: 11, color: "#1976D2", marginTop: 2 },
+  itemBadge: { marginLeft: 8 },
+
   empty: {
     flex: 1,
     justifyContent: "center",
     alignItems: "center",
     padding: 32,
   },
-  emptyText: {
-    fontSize: 18,
-    color: "#999",
-    marginTop: 16,
-  },
+  emptyText: { fontSize: 18, color: "#999", marginTop: 16 },
   emptySubtext: {
     fontSize: 13,
     color: "#bbb",

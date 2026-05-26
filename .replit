@@ -66,6 +66,10 @@ externalPort = 8000
 localPort = 8080
 externalPort = 8080
 
+[[ports]]
+localPort = 8082
+externalPort = 3000
+
 [deployment]
 deploymentTarget = "autoscale"
 run = ["sh", "-c", "PYTHONPATH=server gunicorn --bind=0.0.0.0:5000 --reuse-port --worker-class uvicorn.workers.UvicornWorker identify.api.main:app"]

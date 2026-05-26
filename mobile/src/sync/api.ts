@@ -3,9 +3,11 @@ import {
   SyncUploadVersion,
   SyncDownloadResponse,
   DeviceRegistration,
+  AttachmentData,
 } from "../types";
 
 const TIMEOUT_MS = 15000;
+const UPLOAD_TIMEOUT_MS = 60000;
 
 async function request(
   path: string,
@@ -17,10 +19,12 @@ async function request(
   const syncToken = await getSyncToken();
 
   const headers: Record<string, string> = {
-    "Content-Type": "application/json",
     "X-Device-Id": deviceId,
     ...(options.headers as Record<string, string>),
   };
+  if (!(options.body instanceof FormData)) {
+    headers["Content-Type"] = "application/json";
+  }
   if (syncToken) {
     headers["X-Sync-Token"] = syncToken;
   }
@@ -131,4 +135,70 @@ export async function uploadSync(
     throw new Error(`Sync upload failed: ${response.status}`);
   }
   return response.json();
+}
+
+export async function uploadPhoto(
+  guid: string,
+  localUri: string,
+  filename: string,
+  mimeType: string
+): Promise<AttachmentData> {
+  const baseUrl = await getServerUrl();
+  const deviceId = await getDeviceId();
+
+  const formData = new FormData();
+  formData.append("file", {
+    uri: localUri,
+    type: mimeType,
+    name: filename,
+  } as unknown as Blob);
+
+  const controller = new AbortController();
+  const timeout = setTimeout(() => controller.abort(), UPLOAD_TIMEOUT_MS);
+
+  try {
+    const response = await fetch(
+      `${baseUrl.replace(/\/$/, "")}/api/v1/items/${encodeURIComponent(guid)}/attach`,
+      {
+        method: "POST",
+        body: formData,
+        headers: { "X-Device-Id": deviceId },
+        signal: controller.signal,
+      }
+    );
+    if (!response.ok) throw new Error(`Photo upload failed: ${response.status}`);
+    const data = await response.json();
+    return {
+      attachmentId: data.attachment_id,
+      versionId: data.version_id,
+      filename: data.filename,
+      mimeType: data.mime_type,
+      sizeBytes: data.size_bytes,
+      contentHash: data.content_hash,
+      localUri,
+      synced: true,
+    };
+  } finally {
+    clearTimeout(timeout);
+  }
+}
+
+export async function getAttachmentUrl(guid: string, attachmentId: string): Promise<string> {
+  const baseUrl = await getServerUrl();
+  return `${baseUrl.replace(/\/$/, "")}/api/v1/items/${encodeURIComponent(guid)}/attach/${encodeURIComponent(attachmentId)}`;
+}
+
+export async function checkServerReachable(): Promise<boolean> {
+  try {
+    const baseUrl = await getServerUrl();
+    const controller = new AbortController();
+    const timeout = setTimeout(() => controller.abort(), 5000);
+    const response = await fetch(`${baseUrl.replace(/\/$/, "")}/health`, {
+      signal: controller.signal,
+    });
+    clearTimeout(timeout);
+    return response.ok;
+  } catch {
+    return false;
+  }
 }

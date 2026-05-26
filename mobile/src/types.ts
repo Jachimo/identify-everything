@@ -1,3 +1,30 @@
+export interface LocationData {
+  latitude: number;
+  longitude: number;
+  accuracy: number | null;
+  timestamp: string;
+}
+
+export interface AttachmentData {
+  attachmentId: string;
+  versionId: string;
+  filename: string;
+  mimeType: string | null;
+  sizeBytes: number | null;
+  contentHash: string | null;
+  localUri?: string;
+  synced: boolean;
+}
+
+export interface PendingPhotoUpload {
+  id: string;
+  guid: string;
+  localUri: string;
+  filename: string;
+  mimeType: string;
+  createdAt: string;
+}
+
 export interface ItemData {
   guid: string;
   itemId: string;
@@ -6,10 +33,12 @@ export interface ItemData {
   title?: string;
   description?: string;
   data?: Record<string, unknown>;
+  location?: LocationData;
   createdAt: string;
   updatedAt: string;
   deleted: boolean;
   synced: boolean;
+  pendingPhotoIds?: string[];
 }
 
 export interface ItemVersionData {

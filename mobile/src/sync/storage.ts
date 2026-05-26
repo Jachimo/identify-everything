@@ -1,12 +1,13 @@
-import { ItemData } from "../types";
+import { ItemData, PendingPhotoUpload, AttachmentData } from "../types";
 import { generateGuid, buildItemUrl } from "./guid";
 
-const STORAGE_KEY_ITEMS = "@identify_everything/items";
-const STORAGE_KEY_DEVICE_ID = "@identify_everything/device_id";
-const STORAGE_KEY_SERVER_URL = "@identify_everything/server_url";
-const STORAGE_KEY_SYNC_TOKEN = "@identify_everything/sync_token";
+const KEY_ITEMS = "@identify_everything/items";
+const KEY_DEVICE_ID = "@identify_everything/device_id";
+const KEY_SERVER_URL = "@identify_everything/server_url";
+const KEY_SYNC_TOKEN = "@identify_everything/sync_token";
+const KEY_PENDING_PHOTOS = "@identify_everything/pending_photos";
+const KEY_ATTACHMENTS_PREFIX = "@identify_everything/attachments/";
 
-// In-memory fallback when AsyncStorage is unavailable (web/snack)
 let memoryStore: Record<string, string> = {};
 
 async function getStore(): Promise<typeof import("@react-native-async-storage/async-storage").default | null> {
@@ -36,44 +37,46 @@ async function removeItem(key: string): Promise<void> {
   else delete memoryStore[key];
 }
 
-// Device ID
+// ── Device ID ──────────────────────────────────────────────────────────────
+
 export async function getDeviceId(): Promise<string> {
-  let id = await getItem(STORAGE_KEY_DEVICE_ID);
+  let id = await getItem(KEY_DEVICE_ID);
   if (!id) {
     id = "android-" + Math.random().toString(36).substring(2, 10);
-    await setItem(STORAGE_KEY_DEVICE_ID, id);
+    await setItem(KEY_DEVICE_ID, id);
   }
   return id;
 }
 
-// Server URL
+// ── Server URL ─────────────────────────────────────────────────────────────
+
 export async function getServerUrl(): Promise<string> {
-  const url = await getItem(STORAGE_KEY_SERVER_URL);
+  const url = await getItem(KEY_SERVER_URL);
   if (url) return url;
-  // On web, default to same origin (works in Replit and browser previews)
   if (typeof window !== "undefined" && window.location) {
     return `${window.location.protocol}//${window.location.hostname}:8000`;
   }
-  // On Android emulator, 10.0.2.2 routes to the host machine's localhost
   return "http://10.0.2.2:8000";
 }
 
 export async function setServerUrl(url: string): Promise<void> {
-  await setItem(STORAGE_KEY_SERVER_URL, url);
+  await setItem(KEY_SERVER_URL, url);
 }
 
-// Sync token
+// ── Sync token ─────────────────────────────────────────────────────────────
+
 export async function getSyncToken(): Promise<string | null> {
-  return getItem(STORAGE_KEY_SYNC_TOKEN);
+  return getItem(KEY_SYNC_TOKEN);
 }
 
 export async function setSyncToken(token: string): Promise<void> {
-  await setItem(STORAGE_KEY_SYNC_TOKEN, token);
+  await setItem(KEY_SYNC_TOKEN, token);
 }
 
-// Item CRUD
+// ── Items ──────────────────────────────────────────────────────────────────
+
 export async function getAllItems(): Promise<ItemData[]> {
-  const json = await getItem(STORAGE_KEY_ITEMS);
+  const json = await getItem(KEY_ITEMS);
   if (!json) return [];
   try {
     return JSON.parse(json);
@@ -95,7 +98,7 @@ export async function saveItem(item: ItemData): Promise<void> {
   } else {
     items.push(item);
   }
-  await setItem(STORAGE_KEY_ITEMS, JSON.stringify(items));
+  await setItem(KEY_ITEMS, JSON.stringify(items));
 }
 
 export async function createLocalItem(
@@ -122,7 +125,7 @@ export async function createLocalItem(
 export async function deleteItem(guid: string): Promise<void> {
   const items = await getAllItems();
   const filtered = items.filter((i) => i.guid !== guid);
-  await setItem(STORAGE_KEY_ITEMS, JSON.stringify(filtered));
+  await setItem(KEY_ITEMS, JSON.stringify(filtered));
 }
 
 export async function markItemSynced(guid: string, itemId: string): Promise<void> {
@@ -131,11 +134,67 @@ export async function markItemSynced(guid: string, itemId: string): Promise<void
   if (idx >= 0) {
     items[idx].synced = true;
     items[idx].itemId = itemId;
-    await setItem(STORAGE_KEY_ITEMS, JSON.stringify(items));
+    await setItem(KEY_ITEMS, JSON.stringify(items));
   }
 }
 
 export async function getUnsyncedItems(): Promise<ItemData[]> {
   const items = await getAllItems();
   return items.filter((i) => !i.synced && !i.deleted);
+}
+
+// ── Pending photos ─────────────────────────────────────────────────────────
+
+export async function getPendingPhotos(): Promise<PendingPhotoUpload[]> {
+  const json = await getItem(KEY_PENDING_PHOTOS);
+  if (!json) return [];
+  try {
+    return JSON.parse(json);
+  } catch {
+    return [];
+  }
+}
+
+export async function addPendingPhoto(photo: PendingPhotoUpload): Promise<void> {
+  const photos = await getPendingPhotos();
+  photos.push(photo);
+  await setItem(KEY_PENDING_PHOTOS, JSON.stringify(photos));
+}
+
+export async function removePendingPhoto(id: string): Promise<void> {
+  const photos = await getPendingPhotos();
+  const filtered = photos.filter((p) => p.id !== id);
+  await setItem(KEY_PENDING_PHOTOS, JSON.stringify(filtered));
+}
+
+export async function getPendingPhotosForItem(guid: string): Promise<PendingPhotoUpload[]> {
+  const photos = await getPendingPhotos();
+  return photos.filter((p) => p.guid === guid);
+}
+
+// ── Attachment cache ───────────────────────────────────────────────────────
+
+export async function getCachedAttachments(guid: string): Promise<AttachmentData[]> {
+  const json = await getItem(KEY_ATTACHMENTS_PREFIX + guid);
+  if (!json) return [];
+  try {
+    return JSON.parse(json);
+  } catch {
+    return [];
+  }
+}
+
+export async function saveCachedAttachments(guid: string, attachments: AttachmentData[]): Promise<void> {
+  await setItem(KEY_ATTACHMENTS_PREFIX + guid, JSON.stringify(attachments));
+}
+
+export async function addCachedAttachment(guid: string, attachment: AttachmentData): Promise<void> {
+  const attachments = await getCachedAttachments(guid);
+  const idx = attachments.findIndex((a) => a.attachmentId === attachment.attachmentId);
+  if (idx >= 0) {
+    attachments[idx] = attachment;
+  } else {
+    attachments.push(attachment);
+  }
+  await saveCachedAttachments(guid, attachments);
 }
