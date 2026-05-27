@@ -37,8 +37,10 @@ app.add_middleware(
     allow_headers=["*"],
 )
 
-app.include_router(items.router)
+# sync must be registered before items: its /items/sync path would otherwise
+# be swallowed by the items router's /{guid} wildcard route.
 app.include_router(sync.router)
+app.include_router(items.router)
 app.include_router(search.router)
 
 
