@@ -61,8 +61,7 @@
         }
       ],
       "expo-asset",
-      "expo-font",
-      "expo-barcode-scanner"
+      "expo-font"
     ],
     "experiments": {
       "typedRoutes": true
