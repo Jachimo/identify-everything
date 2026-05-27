@@ -32,6 +32,7 @@ import {
   updateItem,
   uploadPhoto,
   getAttachmentUrl,
+  mapAttachmentFromServer,
 } from "../../src/sync/api";
 import { buildItemUrl } from "../../src/sync/guid";
 import { performSync } from "../../src/sync/sync-manager";
@@ -151,15 +152,7 @@ export default function ItemDetailsScreen() {
           // Load attachments from server
           const serverAttachments: AttachmentData[] = (
             (remote as any).latest_version?.attachments || []
-          ).map((a: any) => ({
-            attachmentId: a.attachment_id,
-            versionId: a.version_id,
-            filename: a.filename,
-            mimeType: a.mime_type,
-            sizeBytes: a.size_bytes,
-            contentHash: a.content_hash,
-            synced: true,
-          }));
+          ).map((a: any) => mapAttachmentFromServer(a));
           await saveCachedAttachments(guidStr, serverAttachments);
           setAttachments(serverAttachments);
         }

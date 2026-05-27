@@ -168,16 +168,7 @@ export async function uploadPhoto(
     );
     if (!response.ok) throw new Error(`Photo upload failed: ${response.status}`);
     const data = await response.json();
-    return {
-      attachmentId: data.attachment_id,
-      versionId: data.version_id,
-      filename: data.filename,
-      mimeType: data.mime_type,
-      sizeBytes: data.size_bytes,
-      contentHash: data.content_hash,
-      localUri,
-      synced: true,
-    };
+    return mapAttachmentFromServer(data, localUri);
   } finally {
     clearTimeout(timeout);
   }
@@ -201,4 +192,17 @@ export async function checkServerReachable(): Promise<boolean> {
   } catch {
     return false;
   }
+}
+
+export function mapAttachmentFromServer(a: any, localUri?: string): AttachmentData {
+  return {
+    attachmentId: a.attachment_id,
+    versionId: a.version_id,
+    filename: a.filename,
+    mimeType: a.mime_type,
+    sizeBytes: a.size_bytes,
+    contentHash: a.content_hash,
+    localUri,
+    synced: true,
+  };
 }

@@ -42,7 +42,7 @@ export default function SettingsScreen() {
     setTestResult(null);
     try {
       const url = serverUrl.trim().replace(/\/$/, "");
-      const resp = await fetch(`${url}/api/v1/health`, {
+      const resp = await fetch(`${url}/health`, {
         signal: AbortSignal.timeout(8000),
       });
       if (resp.ok) {

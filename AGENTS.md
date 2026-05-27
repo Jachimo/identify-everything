@@ -6,7 +6,7 @@
 
 1. **Backend Server** (`server/`) - FastAPI-based REST API with PostgreSQL database
 2. **Label Generator** (`labelgen/`) - Local QR code generator for Avery 64510 labels
-3. **Android Client** (`android/`) - QR scanning and offline-first app (Kotlin)
+3. **Mobile App** (`mobile/`) - Expo/React Native QR scanning and offline-first app
 
 **Current Status**: Architecture is fully specified. Server and Label Generator directories exist but contain minimal/stub code. Android app is in planning/implementation prep.
 
@@ -60,17 +60,18 @@ pytest tests/ --cov=labelgen --cov-report=html
 
 **Dependencies**: `python-qrcode[full]==7.4.0`, `reportlab==4.0.7`, `pillow==10.1.0`
 
-### Android App
+### Mobile App (Expo/React Native)
 
 ```bash
-cd android
-./gradlew assembleDebug          # Build APK
-./gradlew test                    # Unit tests (no emulator)
-./gradlew connectedAndroidTest    # Instrumented tests (real device/emulator)
-./gradlew connectedDebugAndroidTest
+cd mobile
+npm install                       # Install dependencies
+npm start                         # Start Expo dev server
+npx expo start --android          # Start for Android device/emulator
+npx expo start --ios              # Start for iOS simulator
+npm run lint                      # Run ESLint
 ```
 
-**Prerequisites**: Android Studio Hedgehog (2023.1.1+) or newer, JDK 11+, Android SDK API 26+
+**Stack**: Expo 52, React Native 0.76, TypeScript, expo-router, expo-camera, expo-location
 
 ## Project Structure
 
@@ -99,17 +100,18 @@ identify-everything/
 │   ├── requirements.txt
 │   └── Dockerfile
 │
-├── android/                          # Android mobile app
-│   ├── app/
-│   │   └── src/main/
-│   │       ├── AndroidManifest.xml
-│   │       └── java/com/identify/Everything/
-│   └── build.gradle
+├── mobile/                           # Expo/React Native mobile app
+│   ├── app/                          # expo-router routes
+│   ├── src/                          # Source code
+│   │   └── sync/                     # Sync logic (API, storage, sync-manager)
+│   ├── app.json
+│   ├── package.json
+│   └── tsconfig.json
 │
 ├── tests/                            # Test suites
 │   ├── backend/                      # Server API tests
 │   ├── label_generator/              # Label generator tests
-│   └── android/                      # Android app tests
+│   └── mobile/                       # Mobile app tests
 │
 ├── docs/                             # Documentation
 ├── docker-compose.yml                # Dev environment setup
@@ -404,7 +406,7 @@ sync_queue (record_id TEXT PRIMARY KEY, item_id TEXT, operation TEXT, payload JS
 
 - **[DRAFT_ARCHITECTURE.md](./DRAFT_ARCHITECTURE.md)** - Complete architecture, data models, sync protocol, scaling considerations
 - **[QR_GENERATOR.md](./QR_GENERATOR.md)** - QR code generator specifications, CLI API, testing patterns
-- Each component's README.md (server/, android/, labelgen/) for component-specific context
+- Each component's README.md (server/, mobile/, labelgen/) for component-specific context
 
 ## Quick Commands Reference
 
@@ -418,10 +420,11 @@ uvicorn identify.api.main:app --reload              # Server at http://localhost
 cd labelgen && pip install python-qrcode[full] reportlab pillow
 python -m identify.labelgen --batch examples/labels.csv --output test.pdf
 
-# Android Development
-cd android
-./gradlew assembleDebug
-./gradlew connectedAndroidTest
+# Mobile Development
+cd mobile
+npm install
+npm start
+npx expo start --android
 
 # Testing
 docker-compose up -d && pytest tests/
@@ -471,4 +474,4 @@ None of these paths needed for MVP. Plan changes when actual usage patterns emer
 
 - **Server**: Directory structure ready, models/schemas/routers defined in architecture docs. Actual implementation minimal. Follow DRAFT_ARCHITECTURE.md for database schema, sync protocol, error handling.
 - **Label Generator**: No actual implementation files yet (generator.py, formats.py, cli.py all empty). QR_GENERATOR.md contains complete implementation spec.
-- **Android App**: Directory structure ready. Application.kt, MainActivity.kt, GuidGenerator.kt all empty. Manually reference architecture docs when implementing.
+- **Mobile App**: Implemented in `mobile/` using Expo 52 + React Native 0.76 + TypeScript. Routes in `mobile/app/`, sync logic in `mobile/src/sync/`. See `mobile/src/types.ts` for data models.

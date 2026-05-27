@@ -27,17 +27,21 @@ import pytest
 from fastapi.testclient import TestClient
 
 from .conftest import (
-    DEVICE_A, DEVICE_B,
-    SAMPLE_GUID, SAMPLE_URL, SAMPLE_DOMAIN, SAMPLE_GPS,
+    DEVICE_A,
+    DEVICE_B,
+    SAMPLE_GUID,
+    SAMPLE_URL,
+    SAMPLE_DOMAIN,
+    SAMPLE_GPS,
     TINY_JPEG,
-    headers, register,
+    headers,
+    register,
 )
-
 
 # ── Helpers ─────────────────────────────────────────────────────────────────
 
 GUID_PATTERN = re.compile(r"^[a-p0-9]{4}_[a-p0-9]{4}_[a-p0-9]{4}_[a-p0-9]{4}$")
-URL_GUID_RE  = re.compile(r"/objects/v1/([a-p0-9_]{16,19})$")
+URL_GUID_RE = re.compile(r"/objects/v1/([a-p0-9_]{16,19})$")
 
 
 def extract_guid_from_url(url: str) -> str | None:
@@ -51,8 +55,9 @@ def extract_guid_from_url(url: str) -> str | None:
     return f"{raw[0:4]}_{raw[4:8]}_{raw[8:12]}_{raw[12:16]}"
 
 
-def create_item(client, device_id: str, guid: str, url: str, domain: str,
-                data: dict | None = None) -> dict:
+def create_item(
+    client, device_id: str, guid: str, url: str, domain: str, data: dict | None = None
+) -> dict:
     """POST an item and assert 201."""
     payload = {"guid": guid, "url": url, "domain": domain, "device_id": device_id}
     if data:
@@ -62,8 +67,9 @@ def create_item(client, device_id: str, guid: str, url: str, domain: str,
     return resp.json()
 
 
-def update_item(client, device_id: str, guid: str, data: dict,
-                summary: str = "Updated via test") -> dict:
+def update_item(
+    client, device_id: str, guid: str, data: dict, summary: str = "Updated via test"
+) -> dict:
     """PUT item data and assert 200."""
     resp = client.put(
         f"/api/v1/items/{guid}",
@@ -80,8 +86,9 @@ def get_item(client, guid: str) -> dict:
     return resp.json()
 
 
-def sync_download(client, device_id: str, sync_token: str,
-                  after: str | None = None) -> dict:
+def sync_download(
+    client, device_id: str, sync_token: str, after: str | None = None
+) -> dict:
     """GET /api/v1/items/sync and return parsed JSON."""
     params = {"after": after} if after else {}
     resp = client.get(
@@ -96,6 +103,7 @@ def sync_download(client, device_id: str, sync_token: str,
 # ═══════════════════════════════════════════════════════════════════════════
 # 1. Server health
 # ═══════════════════════════════════════════════════════════════════════════
+
 
 class TestHealth:
     def test_health_endpoint_returns_ok(self, client):
@@ -117,40 +125,50 @@ class TestHealth:
 #    must be parseable by the mobile client and accepted by the server.
 # ═══════════════════════════════════════════════════════════════════════════
 
+
 class TestGuidParsing:
-    @pytest.mark.parametrize("url, expected_guid", [
-        (
-            "https://mylabels.example.com/objects/v1/abcd_1234_efgh_5678",
-            "abcd_1234_efgh_5678",
-        ),
-        (
-            "https://example.com/objects/v1/aaaa_bbbb_cccc_dddd",
-            "aaaa_bbbb_cccc_dddd",
-        ),
-        (
-            # No separators — 16-char raw form
-            "https://example.com/objects/v1/abcd1234efgh5678",
-            "abcd_1234_efgh_5678",
-        ),
-    ])
+    @pytest.mark.parametrize(
+        "url, expected_guid",
+        [
+            (
+                "https://mylabels.example.com/objects/v1/abcd_1234_efgh_5678",
+                "abcd_1234_efgh_5678",
+            ),
+            (
+                "https://example.com/objects/v1/aaaa_bbbb_cccc_dddd",
+                "aaaa_bbbb_cccc_dddd",
+            ),
+            (
+                # No separators — 16-char raw form
+                "https://example.com/objects/v1/abcd1234efgh5678",
+                "abcd_1234_efgh_5678",
+            ),
+        ],
+    )
     def test_valid_qr_url_yields_guid(self, url, expected_guid):
         guid = extract_guid_from_url(url)
         assert guid == expected_guid
         assert GUID_PATTERN.match(guid)
 
-    @pytest.mark.parametrize("url", [
-        "https://example.com/wrong/path/abc123",
-        "not-a-url",
-        "",
-        "https://example.com/objects/v1/",
-    ])
+    @pytest.mark.parametrize(
+        "url",
+        [
+            "https://example.com/wrong/path/abc123",
+            "not-a-url",
+            "",
+            "https://example.com/objects/v1/",
+        ],
+    )
     def test_invalid_url_yields_none(self, url):
         assert extract_guid_from_url(url) is None
 
-    @pytest.mark.parametrize("guid", [
-        "abcd_1234_efgh_5678",
-        "aaaa_0000_pppp_9999",
-    ])
+    @pytest.mark.parametrize(
+        "guid",
+        [
+            "abcd_1234_efgh_5678",
+            "aaaa_0000_pppp_9999",
+        ],
+    )
     def test_guid_character_set_is_valid(self, guid):
         """GUIDs use only [a-p] and [0-9], never [q-z]."""
         assert GUID_PATTERN.match(guid)
@@ -159,12 +177,15 @@ class TestGuidParsing:
 
     def test_server_rejects_invalid_guid_format(self, client):
         """Server should still accept any URL string — validation is client-side."""
-        resp = client.post("/api/v1/items", json={
-            "guid": "abcd_1234_efgh_5678",
-            "url": "https://example.com/objects/v1/abcd_1234_efgh_5678",
-            "domain": "example.com",
-            "device_id": DEVICE_A,
-        })
+        resp = client.post(
+            "/api/v1/items",
+            json={
+                "guid": "abcd_1234_efgh_5678",
+                "url": "https://example.com/objects/v1/abcd_1234_efgh_5678",
+                "domain": "example.com",
+                "device_id": DEVICE_A,
+            },
+        )
         assert resp.status_code == 201
 
 
@@ -177,6 +198,7 @@ class TestGuidParsing:
 #      4. Taps "Save Changes"
 #      5. Data syncs to the server
 # ═══════════════════════════════════════════════════════════════════════════
+
 
 class TestSingleDeviceJourney:
     def test_full_scan_metadata_sync_flow(self, client):
@@ -215,9 +237,9 @@ class TestSingleDeviceJourney:
         assert version["data"]["condition"] == "good"
 
         loc = version["data"]["location"]
-        assert loc["latitude"]  == pytest.approx(37.7749)
+        assert loc["latitude"] == pytest.approx(37.7749)
         assert loc["longitude"] == pytest.approx(-122.4194)
-        assert loc["accuracy"]  == pytest.approx(4.8)
+        assert loc["accuracy"] == pytest.approx(4.8)
         assert loc["timestamp"] == "2026-01-15T10:30:00Z"
 
         # Step 6 — Verify item appears in the sync feed for this device
@@ -231,12 +253,15 @@ class TestSingleDeviceJourney:
         create_item(client, DEVICE_A, SAMPLE_GUID, SAMPLE_URL, SAMPLE_DOMAIN)
 
         # Second scan / create attempt
-        resp = client.post("/api/v1/items", json={
-            "guid": SAMPLE_GUID,
-            "url": SAMPLE_URL,
-            "domain": SAMPLE_DOMAIN,
-            "device_id": DEVICE_A,
-        })
+        resp = client.post(
+            "/api/v1/items",
+            json={
+                "guid": SAMPLE_GUID,
+                "url": SAMPLE_URL,
+                "domain": SAMPLE_DOMAIN,
+                "device_id": DEVICE_A,
+            },
+        )
         assert resp.status_code == 409  # Conflict — duplicate GUID
 
     def test_item_version_history_grows_with_each_update(self, client):
@@ -260,6 +285,7 @@ class TestSingleDeviceJourney:
 # ═══════════════════════════════════════════════════════════════════════════
 # 4. Photo attachment — upload, list, and download
 # ═══════════════════════════════════════════════════════════════════════════
+
 
 class TestPhotoAttachment:
     def test_upload_photo_appears_in_item_record(self, client):
@@ -317,7 +343,9 @@ class TestPhotoAttachment:
             ids.append(r.json()["attachment_id"])
 
         record = get_item(client, SAMPLE_GUID)
-        stored_ids = [a["attachment_id"] for a in record["latest_version"]["attachments"]]
+        stored_ids = [
+            a["attachment_id"] for a in record["latest_version"]["attachments"]
+        ]
         for att_id in ids:
             assert att_id in stored_ids
 
@@ -334,16 +362,22 @@ class TestPhotoAttachment:
 #    so any item created by A is immediately visible to B.
 # ═══════════════════════════════════════════════════════════════════════════
 
+
 class TestTwoDeviceRead:
     def test_device_b_sees_item_created_by_device_a(self, client):
         # Device A scans and records the item
         register(client, DEVICE_A)
         guid = extract_guid_from_url(SAMPLE_URL)
         create_item(client, DEVICE_A, guid, SAMPLE_URL, SAMPLE_DOMAIN)
-        update_item(client, DEVICE_A, guid, {
-            "title": "Yellow hard hat",
-            "location": SAMPLE_GPS,
-        })
+        update_item(
+            client,
+            DEVICE_A,
+            guid,
+            {
+                "title": "Yellow hard hat",
+                "location": SAMPLE_GPS,
+            },
+        )
 
         # Device B registers independently — no prior knowledge of the item
         token_b = register(client, DEVICE_B)
@@ -352,7 +386,9 @@ class TestTwoDeviceRead:
         record = get_item(client, guid)
         assert record["guid"] == guid
         assert record["latest_version"]["data"]["title"] == "Yellow hard hat"
-        assert record["latest_version"]["data"]["location"]["latitude"] == pytest.approx(37.7749)
+        assert record["latest_version"]["data"]["location"][
+            "latitude"
+        ] == pytest.approx(37.7749)
 
         # Device B also sees it via the sync feed
         feed = sync_download(client, DEVICE_B, token_b)
@@ -364,23 +400,32 @@ class TestTwoDeviceRead:
         register(client, DEVICE_B)
 
         guid = "aaaa_bbbb_cccc_dddd"
-        url  = f"https://tags.example.com/objects/v1/{guid}"
+        url = f"https://tags.example.com/objects/v1/{guid}"
 
         create_item(client, DEVICE_A, guid, url, "tags.example.com")
-        update_item(client, DEVICE_A, guid, {
-            "title": "Server rack #12",
-            "location": {"latitude": 51.5074, "longitude": -0.1278,
-                         "accuracy": 3.2, "timestamp": "2026-03-01T08:00:00Z"},
-            "notes": "In the data centre, row 3",
-        })
+        update_item(
+            client,
+            DEVICE_A,
+            guid,
+            {
+                "title": "Server rack #12",
+                "location": {
+                    "latitude": 51.5074,
+                    "longitude": -0.1278,
+                    "accuracy": 3.2,
+                    "timestamp": "2026-03-01T08:00:00Z",
+                },
+                "notes": "In the data centre, row 3",
+            },
+        )
 
         token_b = register(client, DEVICE_B)
         record = get_item(client, guid)
-        data   = record["latest_version"]["data"]
+        data = record["latest_version"]["data"]
 
-        assert data["title"]  == "Server rack #12"
-        assert data["notes"]  == "In the data centre, row 3"
-        assert data["location"]["latitude"]  == pytest.approx(51.5074)
+        assert data["title"] == "Server rack #12"
+        assert data["notes"] == "In the data centre, row 3"
+        assert data["location"]["latitude"] == pytest.approx(51.5074)
         assert data["location"]["longitude"] == pytest.approx(-0.1278)
 
 
@@ -390,49 +435,83 @@ class TestTwoDeviceRead:
 #    Then verifies the full version chain is intact.
 # ═══════════════════════════════════════════════════════════════════════════
 
+
 class TestTwoDeviceBidirectionalSync:
     def test_device_a_reads_update_made_by_device_b(self, client):
         register(client, DEVICE_A)
         register(client, DEVICE_B)
 
-        guid = "sync_aaaa_test_0001"
-        url  = f"https://example.com/objects/v1/{guid}"
+        guid = "ninc_aaaa_0001"
+        url = f"https://example.com/objects/v1/{guid}"
 
         # Device A creates and sets initial state
-        create_item(client, DEVICE_A, guid, url, "example.com", data={
-            "title": "Laptop — Dell XPS",
-            "status": "in-use",
-        })
+        create_item(
+            client,
+            DEVICE_A,
+            guid,
+            url,
+            "example.com",
+            data={
+                "title": "Laptop — Dell XPS",
+                "status": "in-use",
+            },
+        )
 
         # Device B scans the same label later; adds its own update
-        update_item(client, DEVICE_B, guid, {
-            "title": "Laptop — Dell XPS",
-            "status": "returned",
-            "checked_in_by": "device-beta",
-            "location": {"latitude": 40.7128, "longitude": -74.0060,
-                         "accuracy": 6.0, "timestamp": "2026-02-10T14:20:00Z"},
-        }, summary="Checked in by Device B")
+        update_item(
+            client,
+            DEVICE_B,
+            guid,
+            {
+                "title": "Laptop — Dell XPS",
+                "status": "returned",
+                "checked_in_by": "device-beta",
+                "location": {
+                    "latitude": 40.7128,
+                    "longitude": -74.0060,
+                    "accuracy": 6.0,
+                    "timestamp": "2026-02-10T14:20:00Z",
+                },
+            },
+            summary="Checked in by Device B",
+        )
 
         # Device A reads the item — must see Device B's update
         record = get_item(client, guid)
-        data   = record["latest_version"]["data"]
-        assert data["status"]         == "returned"
-        assert data["checked_in_by"]  == "device-beta"
+        data = record["latest_version"]["data"]
+        assert data["status"] == "returned"
+        assert data["checked_in_by"] == "device-beta"
         assert data["location"]["latitude"] == pytest.approx(40.7128)
 
     def test_version_chain_reflects_both_devices(self, client):
         register(client, DEVICE_A)
         register(client, DEVICE_B)
 
-        guid = "sync_bbbb_chain_0002"
-        url  = f"https://example.com/objects/v1/{guid}"
+        guid = "ninc_bbbb_chain_0002"
+        url = f"https://example.com/objects/v1/{guid}"
 
-        create_item(client, DEVICE_A, guid, url, "example.com",
-                    data={"title": "Keyboard", "condition": "new"})
-        update_item(client, DEVICE_A, guid, {"title": "Keyboard", "condition": "used"},
-                    summary="Device A marks as used")
-        update_item(client, DEVICE_B, guid, {"title": "Keyboard", "condition": "worn"},
-                    summary="Device B marks as worn")
+        create_item(
+            client,
+            DEVICE_A,
+            guid,
+            url,
+            "example.com",
+            data={"title": "Keyboard", "condition": "new"},
+        )
+        update_item(
+            client,
+            DEVICE_A,
+            guid,
+            {"title": "Keyboard", "condition": "used"},
+            summary="Device A marks as used",
+        )
+        update_item(
+            client,
+            DEVICE_B,
+            guid,
+            {"title": "Keyboard", "condition": "worn"},
+            summary="Device B marks as worn",
+        )
 
         # Version history: initial + 2 updates = 3 entries
         resp = client.get(f"/api/v1/items/{guid}/versions")
@@ -455,23 +534,39 @@ class TestTwoDeviceBidirectionalSync:
         register(client, DEVICE_A)
         register(client, DEVICE_B)
 
-        guid = "sync_cccc_gps_00003"
-        url  = f"https://example.com/objects/v1/{guid}"
+        guid = "ninc_cccc_gpa_00003"
+        url = f"https://example.com/objects/v1/{guid}"
 
-        create_item(client, DEVICE_A, guid, url, "example.com",
-                    data={"title": "Fire hose cabinet", "location": None})
+        create_item(
+            client,
+            DEVICE_A,
+            guid,
+            url,
+            "example.com",
+            data={"title": "Fire hose cabinet", "location": None},
+        )
 
         # Device B is physically at the cabinet; adds GPS
-        update_item(client, DEVICE_B, guid, {
-            "title": "Fire hose cabinet",
-            "location": {"latitude": 48.8566, "longitude": 2.3522,
-                         "accuracy": 2.1, "timestamp": "2026-04-05T09:15:00Z"},
-        }, summary="Location tagged by Device B on-site")
+        update_item(
+            client,
+            DEVICE_B,
+            guid,
+            {
+                "title": "Fire hose cabinet",
+                "location": {
+                    "latitude": 48.8566,
+                    "longitude": 2.3522,
+                    "accuracy": 2.1,
+                    "timestamp": "2026-04-05T09:15:00Z",
+                },
+            },
+            summary="Location tagged by Device B on-site",
+        )
 
         # Device A reads — now has GPS even though it never was at the location
         record = get_item(client, guid)
-        loc    = record["latest_version"]["data"]["location"]
-        assert loc["latitude"]  == pytest.approx(48.8566)
+        loc = record["latest_version"]["data"]["location"]
+        assert loc["latitude"] == pytest.approx(48.8566)
         assert loc["longitude"] == pytest.approx(2.3522)
 
 
@@ -479,6 +574,7 @@ class TestTwoDeviceBidirectionalSync:
 # 7. Delta sync — each device only fetches changes since its last sync
 #    Validates the `?after=` timestamp parameter used by the sync manager.
 # ═══════════════════════════════════════════════════════════════════════════
+
 
 class TestDeltaSync:
     def test_device_b_receives_items_created_by_device_a(self, client):
@@ -488,10 +584,16 @@ class TestDeltaSync:
         # Device A creates several items
         guids_a = []
         for i in range(3):
-            g = f"delta_aaaa_item_{i:04d}"
+            g = f"delpa_aaaa_ipem_{i:04d}"
             u = f"https://example.com/objects/v1/{g}"
-            create_item(client, DEVICE_A, g, u, "example.com",
-                        data={"title": f"Item {i}", "created_by": "A"})
+            create_item(
+                client,
+                DEVICE_A,
+                g,
+                u,
+                "example.com",
+                data={"title": f"Item {i}", "created_by": "A"},
+            )
             guids_a.append(g)
 
         # Device B syncs with no `after` filter → must see all 3 items
@@ -505,7 +607,7 @@ class TestDeltaSync:
 
         # Create two items "early"
         for i in range(2):
-            g = f"delta_early_{i:04d}_test"
+            g = f"delpa_eabpa_{i:04d}_0001"
             u = f"https://example.com/objects/v1/{g}"
             create_item(client, DEVICE_A, g, u, "example.com")
 
@@ -515,10 +617,11 @@ class TestDeltaSync:
         # Create two more items "late"
         late_guids = []
         for i in range(2):
-            g = f"delta_late_{i:04d}_test"
+            g = f"delpa_lape_{i:04d}_0001"
             u = f"https://example.com/objects/v1/{g}"
-            create_item(client, DEVICE_A, g, u, "example.com",
-                        data={"title": f"Late item {i}"})
+            create_item(
+                client, DEVICE_A, g, u, "example.com", data={"title": f"Late item {i}"}
+            )
             late_guids.append(g)
 
         # Sync with the cutoff → should see only the 2 late items
@@ -528,7 +631,7 @@ class TestDeltaSync:
         for g in late_guids:
             assert g in returned, f"Expected late item {g} but got: {returned}"
 
-        early_guids = {f"delta_early_{i:04d}_test" for i in range(2)}
+        early_guids = {f"delpa_eabpa_{i:04d}_0001" for i in range(2)}
         for g in early_guids:
             assert g not in returned, f"Early item {g} should not appear after cutoff"
 
@@ -540,20 +643,30 @@ class TestDeltaSync:
 
         # Device A creates 2 items; records the time
         for i in range(2):
-            g = f"bidir_a_{i:04d}_test"
-            create_item(client, DEVICE_A, g,
-                        f"https://x.com/objects/v1/{g}", "x.com",
-                        data={"origin": "device-a"})
+            g = f"bidia_a_{i:04d}_0001"
+            create_item(
+                client,
+                DEVICE_A,
+                g,
+                f"https://x.com/objects/v1/{g}",
+                "x.com",
+                data={"origin": "device-a"},
+            )
 
         cutoff_b = datetime.now(timezone.utc).isoformat()
 
         # Device B creates 2 items
         b_guids = []
         for i in range(2):
-            g = f"bidir_b_{i:04d}_test"
-            create_item(client, DEVICE_B, g,
-                        f"https://x.com/objects/v1/{g}", "x.com",
-                        data={"origin": "device-b"})
+            g = f"bidia_b_{i:04d}_0001"
+            create_item(
+                client,
+                DEVICE_B,
+                g,
+                f"https://x.com/objects/v1/{g}",
+                "x.com",
+                data={"origin": "device-b"},
+            )
             b_guids.append(g)
 
         cutoff_a = datetime.now(timezone.utc).isoformat()
@@ -569,7 +682,7 @@ class TestDeltaSync:
         feed_b = sync_download(client, DEVICE_B, token_b, after=cutoff_a)
         b_received = {i["guid"] for i in feed_b["changes"]["items_added"]}
         for g in b_guids:
-            assert g not in b_received   # B's items were created before cutoff_a
+            assert g not in b_received  # B's items were created before cutoff_a
 
 
 # ═══════════════════════════════════════════════════════════════════════════
@@ -578,6 +691,7 @@ class TestDeltaSync:
 #    POST /api/v1/sync/upload when connectivity is restored.
 # ═══════════════════════════════════════════════════════════════════════════
 
+
 class TestOfflineSyncUpload:
     def test_offline_queue_creates_items_on_server(self, client):
         token = register(client, DEVICE_A)
@@ -585,11 +699,11 @@ class TestOfflineSyncUpload:
         # Simulate items that were created offline and queued locally
         offline_items = [
             {
-                "item_id": f"local-id-{i:03d}",   # local UUID from the mobile
-                "guid":    f"offl_aaaa_{i:04d}_test",
-                "url":     f"https://example.com/objects/v1/offl_aaaa_{i:04d}_test",
-                "domain":  "example.com",
-                "data":    {"title": f"Offline item {i}", "location": SAMPLE_GPS},
+                "item_id": f"local-id-{i:03d}",  # local UUID from the mobile
+                "guid": f"offl_aaaa_{i:04d}_0001",
+                "url": f"https://example.com/objects/v1/offl_aaaa_{i:04d}_0001",
+                "domain": "example.com",
+                "data": {"title": f"Offline item {i}", "location": SAMPLE_GPS},
                 "change_summary": "Created offline",
             }
             for i in range(4)
@@ -613,29 +727,35 @@ class TestOfflineSyncUpload:
     def test_offline_queue_with_gps_data_preserved(self, client):
         token = register(client, DEVICE_A)
 
-        guid = "offl_gps_test_0001"
+        guid = "offl_gpa_0001"
         resp = client.post(
             "/api/v1/sync/upload",
-            json={"changes": {"item_versions": [{
-                "item_id": "local-gps-001",
-                "guid":    guid,
-                "url":     f"https://example.com/objects/v1/{guid}",
-                "domain":  "example.com",
-                "data": {
-                    "title": "Tagged widget",
-                    "location": SAMPLE_GPS,
-                },
-                "change_summary": "Scanned at location, synced later",
-            }]}},
+            json={
+                "changes": {
+                    "item_versions": [
+                        {
+                            "item_id": "local-gps-001",
+                            "guid": guid,
+                            "url": f"https://example.com/objects/v1/{guid}",
+                            "domain": "example.com",
+                            "data": {
+                                "title": "Tagged widget",
+                                "location": SAMPLE_GPS,
+                            },
+                            "change_summary": "Scanned at location, synced later",
+                        }
+                    ]
+                }
+            },
             headers=headers(DEVICE_A, token),
         )
         assert resp.status_code == 200
 
         record = get_item(client, guid)
-        data   = record["latest_version"]["data"]
+        data = record["latest_version"]["data"]
         assert data["title"] == "Tagged widget"
         loc = data["location"]
-        assert loc["latitude"]  == pytest.approx(37.7749)
+        assert loc["latitude"] == pytest.approx(37.7749)
         assert loc["longitude"] == pytest.approx(-122.4194)
 
     def test_two_device_offline_queues_merge_on_server(self, client):
@@ -647,31 +767,35 @@ class TestOfflineSyncUpload:
         a_items = [
             {
                 "item_id": f"a-local-{i}",
-                "guid":    f"merge_a_{i:04d}_test",
-                "url":     f"https://x.com/objects/v1/merge_a_{i:04d}_test",
-                "domain":  "x.com",
-                "data":    {"created_by": "device-a", "index": i},
+                "guid": f"mejge_a_{i:04d}_0001",
+                "url": f"https://x.com/objects/v1/mejge_a_{i:04d}_0001",
+                "domain": "x.com",
+                "data": {"created_by": "device-a", "index": i},
             }
             for i in range(3)
         ]
         b_items = [
             {
                 "item_id": f"b-local-{i}",
-                "guid":    f"merge_b_{i:04d}_test",
-                "url":     f"https://x.com/objects/v1/merge_b_{i:04d}_test",
-                "domain":  "x.com",
-                "data":    {"created_by": "device-b", "index": i},
+                "guid": f"mejge_b_{i:04d}_0001",
+                "url": f"https://x.com/objects/v1/mejge_b_{i:04d}_0001",
+                "domain": "x.com",
+                "data": {"created_by": "device-b", "index": i},
             }
             for i in range(3)
         ]
 
         # Both devices push their offline queues
-        r_a = client.post("/api/v1/sync/upload",
-                          json={"changes": {"item_versions": a_items}},
-                          headers=headers(DEVICE_A, token_a))
-        r_b = client.post("/api/v1/sync/upload",
-                          json={"changes": {"item_versions": b_items}},
-                          headers=headers(DEVICE_B, token_b))
+        r_a = client.post(
+            "/api/v1/sync/upload",
+            json={"changes": {"item_versions": a_items}},
+            headers=headers(DEVICE_A, token_a),
+        )
+        r_b = client.post(
+            "/api/v1/sync/upload",
+            json={"changes": {"item_versions": b_items}},
+            headers=headers(DEVICE_B, token_b),
+        )
         assert r_a.status_code == 200
         assert r_b.status_code == 200
 
@@ -682,5 +806,5 @@ class TestOfflineSyncUpload:
         all_guids = {i["guid"] for i in feed_a["changes"]["items_added"]}
         assert len(all_guids) == 6
 
-        b_all  = {i["guid"] for i in feed_b["changes"]["items_added"]}
+        b_all = {i["guid"] for i in feed_b["changes"]["items_added"]}
         assert all_guids == b_all  # Both devices see the same set

@@ -6,7 +6,9 @@ from sqlalchemy.orm import Session
 from ..models.database import Device, Item, ItemVersion, SyncRecord
 
 
-def register_or_update_device(db: Session, device_id: str, device_name: Optional[str] = None) -> Device:
+def register_or_update_device(
+    db: Session, device_id: str, device_name: Optional[str] = None
+) -> Device:
     device = db.query(Device).filter(Device.device_id == device_id).first()
     if not device:
         device = Device(
@@ -66,7 +68,6 @@ def process_sync_upload(db: Session, device_id: str, changes: dict) -> dict:
                 item = existing
             else:
                 item = Item(
-                    item_id=item_id,
                     guid=guid,
                     url=url or f"https://{domain}/objects/v1/{guid}",
                     domain=domain,
@@ -75,14 +76,15 @@ def process_sync_upload(db: Session, device_id: str, changes: dict) -> dict:
                 db.flush()
                 created += 1
 
+        # Always use the SERVER's item_id for the version FK:
         db.query(ItemVersion).filter(
-            ItemVersion.item_id == item_id,
+            ItemVersion.item_id == item.item_id,
             ItemVersion.is_canonical == True,
         ).update({"is_canonical": False})
 
         version = ItemVersion(
             version_id=str(uuid.uuid4()),
-            item_id=item_id,
+            item_id=item.item_id,  # ← server PK, not client's
             device_id=device_id,
             data=version_data.get("data", {}),
             change_summary=version_data.get("change_summary"),

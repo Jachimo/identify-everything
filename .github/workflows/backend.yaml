@@ -44,15 +44,13 @@ jobs:
         uses: actions/setup-python@v4
         with:
           python-version: ${{ matrix.python-version }}
-      - name: Run migrations
+      - name: Install dependencies
         run: |
           pip install -r server/requirements.txt
-          cd server
-          alembic upgrade head
       - name: Run API tests
         run: |
           cd server
-          pytest tests/ --env 0 -v
+          pytest tests/ -v
       - name: Generate coverage report
         run: |
           cd server
@@ -78,7 +76,7 @@ jobs:
         shell: bash
         working-directory: server
         run: |
-          docker-compose exec api pytest tests/ --test-api -v
+          docker-compose exec api pytest tests/ -v
 
       - name: Cleanup
         run: docker-compose down

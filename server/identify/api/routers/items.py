@@ -1,12 +1,21 @@
-import os
+from pathlib import Path
 from fastapi import APIRouter, Depends, HTTPException, UploadFile, File, Header
 from fastapi.responses import FileResponse
 from sqlalchemy.orm import Session
 
 from ...database import get_db
 from ...models.database import Attachment
-from ...schemas.item import ItemCreate, ItemDetailOut, ItemOut, ItemUpdate, ItemVersionOut, AttachmentOut
+from ...schemas.item import (
+    ItemCreate,
+    ItemDetailOut,
+    ItemOut,
+    ItemUpdate,
+    ItemVersionOut,
+    AttachmentOut,
+)
 from ...services import item_service, storage_service
+from ...api.config import settings
+from .sync import _validate_device
 
 router = APIRouter(prefix="/api/v1/items", tags=["items"])
 
@@ -60,6 +69,11 @@ def upload_attachment(
         raise HTTPException(status_code=404, detail="VERSION_NOT_FOUND")
 
     data = file.file.read()
+    if len(data) > settings.max_upload_size:
+        raise HTTPException(
+            status_code=413,
+            detail=f"File exceeds {settings.max_upload_size // (1024*1024)}MB limit",
+        )
     file_path, content_hash, size = storage_service.save_file(file.filename, data)
 
     attachment = Attachment(
@@ -78,11 +92,15 @@ def upload_attachment(
 
 @router.get("/{guid}/attach/{attachment_id}")
 def download_attachment(guid: str, attachment_id: str, db: Session = Depends(get_db)):
-    attachment = db.query(Attachment).filter(Attachment.attachment_id == attachment_id).first()
+    attachment = (
+        db.query(Attachment).filter(Attachment.attachment_id == attachment_id).first()
+    )
     if not attachment:
         raise HTTPException(status_code=404, detail="ATTACHMENT_NOT_FOUND")
-    from pathlib import Path
-    path = Path(attachment.file_path)
+    path = Path(attachment.file_path).resolve()
+    upload_root = Path(settings.upload_dir).resolve()
+    if not str(path).startswith(str(upload_root)):
+        raise HTTPException(status_code=403, detail="FORBIDDEN")
     if not path.exists():
         raise HTTPException(status_code=404, detail="FILE_NOT_FOUND")
     return FileResponse(
@@ -93,17 +111,35 @@ def download_attachment(guid: str, attachment_id: str, db: Session = Depends(get
 
 
 @router.get("/{guid}/version/{vid}/attachments", response_model=list[AttachmentOut])
-def list_attachments(guid: str, vid: str, db: Session = Depends(get_db)):
+def list_attachments(
+    guid: str,
+    vid: str,
+    x_device_id: str = Header(...),
+    x_sync_token: str = Header(...),
+    db: Session = Depends(get_db),
+):
+    _validate_device(db, x_device_id, x_sync_token)
     attachments = db.query(Attachment).filter(Attachment.version_id == vid).all()
     return [AttachmentOut.model_validate(a) for a in attachments]
 
 
 @router.delete("/{guid}/version/{vid}/attach/{attachment_id}", status_code=204)
-def delete_attachment(guid: str, vid: str, attachment_id: str, db: Session = Depends(get_db)):
-    attachment = db.query(Attachment).filter(Attachment.attachment_id == attachment_id).first()
+def delete_attachment(
+    guid: str,
+    vid: str,
+    attachment_id: str,
+    x_device_id: str = Header(...),
+    x_sync_token: str = Header(...),
+    db: Session = Depends(get_db),
+):
+    _validate_device(db, x_device_id, x_sync_token)
+    attachment = (
+        db.query(Attachment).filter(Attachment.attachment_id == attachment_id).first()
+    )
     if not attachment:
         raise HTTPException(status_code=404, detail="ATTACHMENT_NOT_FOUND")
     if not storage_service.delete_file(attachment.file_path):
-        raise HTTPException(status_code=500, detail="FILE_DELETE_FAILED")
+        if Path(attachment.file_path).exists():
+            raise HTTPException(status_code=500, detail="FILE_DELETE_FAILED")
     db.delete(attachment)
     db.commit()

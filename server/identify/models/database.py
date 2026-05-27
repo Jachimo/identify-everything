@@ -1,7 +1,14 @@
 import uuid
 from datetime import datetime, timezone
 from sqlalchemy import (
-    Column, String, Boolean, DateTime, Integer, Text, ForeignKey, JSON
+    Column,
+    String,
+    Boolean,
+    DateTime,
+    Integer,
+    Text,
+    ForeignKey,
+    JSON,
 )
 from sqlalchemy.orm import DeclarativeBase, relationship
 
@@ -49,7 +56,9 @@ class ItemVersion(Base):
     device_id = Column(String, ForeignKey("devices.device_id"), nullable=True)
     data = Column(JSON, default=dict)
     change_summary = Column(Text, nullable=True)
-    parent_version_id = Column(String, ForeignKey("item_versions.version_id"), nullable=True)
+    parent_version_id = Column(
+        String, ForeignKey("item_versions.version_id"), nullable=True
+    )
     created_at = Column(DateTime(timezone=True), default=utcnow)
     is_canonical = Column(Boolean, default=False)
 

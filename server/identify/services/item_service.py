@@ -41,10 +41,10 @@ def get_item_with_version(db: Session, guid: str):
     return item, version
 
 
-def get_item_versions(db: Session, guid: str) -> list[ItemVersion]:
+def get_item_versions(db: Session, guid: str) -> list[ItemVersion] | None:
     item = get_item(db, guid)
     if not item:
-        return []
+        return None
     return (
         db.query(ItemVersion)
         .filter(ItemVersion.item_id == item.item_id)
@@ -133,13 +133,11 @@ def search_items(db: Session, q: str) -> list[Item]:
     return (
         db.query(Item)
         .filter(Item.deleted == False)
-        .join(ItemVersion, ItemVersion.item_id == Item.item_id)
         .filter(
             (Item.guid.ilike(pattern))
             | (Item.url.ilike(pattern))
             | (Item.domain.ilike(pattern))
         )
-        .distinct()
         .limit(50)
         .all()
     )
