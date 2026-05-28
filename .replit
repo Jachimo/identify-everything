@@ -55,7 +55,7 @@ waitForPort = 8000
 outputType = "console"
 
 [[ports]]
-localPort = 8000
+localPort = 8080
 externalPort = 80
 
 [[ports]]
